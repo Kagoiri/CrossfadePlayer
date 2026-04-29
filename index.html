@@ -1,0 +1,2104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebCrossFader</title>
+  <style>
+    /* ===== CSS Custom Properties ===== */
+    :root {
+      --color-bg: #0d0d1a;
+      --color-bg-panel: #141428;
+      --color-bg-input: #1a1a35;
+      --color-bg-hover: #1e1e3a;
+      --color-text: #e0e0f0;
+      --color-text-muted: #8888aa;
+      --color-track-a: #00d4ff;
+      --color-track-a-dim: rgba(0, 212, 255, 0.15);
+      --color-track-b: #ff6b9d;
+      --color-track-b-dim: rgba(255, 107, 157, 0.15);
+      --color-accent: #7c5cff;
+      --color-border: #2a2a4a;
+      --color-error: #ff4466;
+      --color-error-bg: rgba(255, 68, 102, 0.1);
+      --color-success: #44ff88;
+      --color-slider-track: #2a2a4a;
+      --color-slider-thumb: #e0e0f0;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --transition-fast: 0.15s ease;
+      --transition-normal: 0.25s ease;
+    }
+
+    /* ===== Reset & Base ===== */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ===== Accessibility: Visually Hidden ===== */
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ===== Header ===== */
+    header {
+      text-align: center;
+      padding: 20px 16px 12px;
+      background: linear-gradient(180deg, rgba(124, 92, 255, 0.08) 0%, transparent 100%);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      background: linear-gradient(135deg, var(--color-track-a), var(--color-accent), var(--color-track-b));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* ===== App Container: 3-Column Grid ===== */
+    .app-container {
+      display: grid;
+      grid-template-columns: 1fr minmax(280px, 1.2fr) 1fr;
+      gap: 16px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px 16px;
+      min-height: calc(100vh - 80px);
+      align-items: start;
+    }
+
+    /* ===== Track Panels ===== */
+    .track-panel {
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    #track-a {
+      border-top: 3px solid var(--color-track-a);
+    }
+
+    #track-b {
+      border-top: 3px solid var(--color-track-b);
+    }
+
+    .track-title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    #track-a .track-title {
+      color: var(--color-track-a);
+    }
+
+    #track-b .track-title {
+      color: var(--color-track-b);
+    }
+
+    /* ===== URL Input & Load Button ===== */
+    .track-url-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .url-input {
+      flex: 1;
+      padding: 10px 12px;
+      background: var(--color-bg-input);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-text);
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color var(--transition-fast);
+      min-height: 44px;
+    }
+
+    .url-input::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    .url-input:focus {
+      border-color: var(--color-accent);
+    }
+
+    #track-a .url-input:focus {
+      border-color: var(--color-track-a);
+    }
+
+    #track-b .url-input:focus {
+      border-color: var(--color-track-b);
+    }
+
+    .load-btn {
+      padding: 10px 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-input);
+      color: var(--color-text);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast);
+      white-space: nowrap;
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    .load-btn:hover {
+      background: var(--color-bg-hover);
+    }
+
+    #track-a .load-btn:hover {
+      border-color: var(--color-track-a);
+      color: var(--color-track-a);
+    }
+
+    #track-b .load-btn:hover {
+      border-color: var(--color-track-b);
+      color: var(--color-track-b);
+    }
+
+    .load-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* ===== Loading Indicator ===== */
+    .loading-indicator {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(124, 92, 255, 0.08);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+    }
+
+    .loading-indicator[hidden] {
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--color-border);
+      border-top-color: var(--color-accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    #track-a .spinner {
+      border-top-color: var(--color-track-a);
+    }
+
+    #track-b .spinner {
+      border-top-color: var(--color-track-b);
+    }
+
+    /* ===== Error Display ===== */
+    .error-display {
+      padding: 10px 14px;
+      background: var(--color-error-bg);
+      border: 1px solid rgba(255, 68, 102, 0.3);
+      border-radius: var(--radius-sm);
+      color: var(--color-error);
+      font-size: 0.82rem;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .error-display[hidden] {
+      display: none;
+    }
+
+    /* ===== Track Info ===== */
+    .track-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      min-height: 20px;
+    }
+
+    .track-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 70%;
+    }
+
+    .track-duration {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===== Waveform Canvas ===== */
+    .waveform-canvas {
+      width: 100%;
+      height: 80px;
+      background: var(--color-bg-input);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: block;
+    }
+
+    /* ===== Volume Control (Vertical Slider) ===== */
+    .volume-control {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding-top: 4px;
+    }
+
+    .volume-control label {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .volume-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 120px;
+      height: 6px;
+      background: transparent;
+      cursor: pointer;
+      writing-mode: vertical-lr;
+      direction: rtl;
+      min-height: 120px;
+      min-width: 44px;
+      padding: 0 16px;
+    }
+
+    /* Volume slider track */
+    .volume-slider::-webkit-slider-runnable-track {
+      width: 6px;
+      height: 100%;
+      background: var(--color-slider-track);
+      border-radius: 3px;
+    }
+
+    .volume-slider::-moz-range-track {
+      width: 6px;
+      height: 100%;
+      background: var(--color-slider-track);
+      border-radius: 3px;
+      border: none;
+    }
+
+    /* Volume slider thumb */
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      background: var(--color-slider-thumb);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      margin-left: -7px;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .volume-slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      background: var(--color-slider-thumb);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    #track-a .volume-slider::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 12px var(--color-track-a);
+      transform: scale(1.15);
+    }
+
+    #track-a .volume-slider::-moz-range-thumb:hover {
+      box-shadow: 0 0 12px var(--color-track-a);
+      transform: scale(1.15);
+    }
+
+    #track-b .volume-slider::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 12px var(--color-track-b);
+      transform: scale(1.15);
+    }
+
+    #track-b .volume-slider::-moz-range-thumb:hover {
+      box-shadow: 0 0 12px var(--color-track-b);
+      transform: scale(1.15);
+    }
+
+    /* ===== Center Panel ===== */
+    .center-panel {
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    /* ===== Transport Controls ===== */
+    .transport-controls {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .transport-btn {
+      padding: 12px 24px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg-input);
+      color: var(--color-text);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast),
+                  transform var(--transition-fast), box-shadow var(--transition-fast);
+      min-height: 48px;
+      min-width: 48px;
+      user-select: none;
+    }
+
+    .transport-btn:hover:not(:disabled) {
+      background: var(--color-bg-hover);
+      border-color: var(--color-accent);
+    }
+
+    .transport-btn:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    .transport-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+
+    /* Play button specific */
+    #play-btn:not(:disabled):hover {
+      border-color: var(--color-success);
+      box-shadow: 0 0 12px rgba(68, 255, 136, 0.15);
+    }
+
+    /* Loop button active state */
+    #loop-btn[aria-pressed="true"] {
+      background: rgba(124, 92, 255, 0.2);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+      box-shadow: 0 0 10px rgba(124, 92, 255, 0.2);
+    }
+
+    /* ===== Progress Bar ===== */
+    .progress-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .progress-bar {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      background: transparent;
+      cursor: pointer;
+      min-height: 44px;
+      padding: 18px 0;
+    }
+
+    .progress-bar::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 8px;
+      background: var(--color-slider-track);
+      border-radius: 4px;
+    }
+
+    .progress-bar::-moz-range-track {
+      width: 100%;
+      height: 8px;
+      background: var(--color-slider-track);
+      border-radius: 4px;
+      border: none;
+    }
+
+    .progress-bar::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: var(--color-accent);
+      border-radius: 50%;
+      border: none;
+      margin-top: -4px;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(124, 92, 255, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .progress-bar::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      background: var(--color-accent);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(124, 92, 255, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .progress-bar::-webkit-slider-thumb:hover {
+      transform: scale(1.3);
+      box-shadow: 0 0 14px rgba(124, 92, 255, 0.6);
+    }
+
+    .progress-bar::-moz-range-thumb:hover {
+      transform: scale(1.3);
+      box-shadow: 0 0 14px rgba(124, 92, 255, 0.6);
+    }
+
+    .time-display {
+      display: flex;
+      justify-content: center;
+      gap: 4px;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===== Crossfader ===== */
+    .crossfader-container {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .crossfader-snap-btn {
+      font-size: 0.85rem;
+      font-weight: 700;
+      min-width: 36px;
+      min-height: 36px;
+      text-align: center;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-input);
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast),
+                  color var(--transition-fast), transform var(--transition-fast);
+      padding: 4px 10px;
+      user-select: none;
+    }
+
+    .crossfader-snap-a {
+      color: var(--color-track-a);
+    }
+
+    .crossfader-snap-b {
+      color: var(--color-track-b);
+    }
+
+    .crossfader-snap-a:hover {
+      background: var(--color-track-a-dim);
+      border-color: var(--color-track-a);
+    }
+
+    .crossfader-snap-b:hover {
+      background: var(--color-track-b-dim);
+      border-color: var(--color-track-b);
+    }
+
+    .crossfader-snap-btn:active {
+      transform: scale(0.92);
+    }
+
+    .crossfader {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1;
+      height: 10px;
+      background: transparent;
+      cursor: pointer;
+      min-height: 44px;
+      padding: 17px 0;
+    }
+
+    .crossfader::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 10px;
+      background: linear-gradient(90deg, var(--color-track-a), var(--color-accent) 50%, var(--color-track-b));
+      border-radius: 5px;
+      opacity: 0.4;
+      transition: opacity var(--transition-fast);
+    }
+
+    .crossfader::-moz-range-track {
+      width: 100%;
+      height: 10px;
+      background: linear-gradient(90deg, var(--color-track-a), var(--color-accent) 50%, var(--color-track-b));
+      border-radius: 5px;
+      border: none;
+      opacity: 0.4;
+      transition: opacity var(--transition-fast);
+    }
+
+    .crossfader:hover::-webkit-slider-runnable-track {
+      opacity: 0.7;
+    }
+
+    .crossfader:hover::-moz-range-track {
+      opacity: 0.7;
+    }
+
+    .crossfader::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 28px;
+      height: 28px;
+      background: var(--color-slider-thumb);
+      border-radius: 6px;
+      border: 2px solid var(--color-accent);
+      margin-top: -9px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .crossfader::-moz-range-thumb {
+      width: 28px;
+      height: 28px;
+      background: var(--color-slider-thumb);
+      border-radius: 6px;
+      border: 2px solid var(--color-accent);
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .crossfader::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 2px 14px rgba(124, 92, 255, 0.5);
+    }
+
+    .crossfader::-moz-range-thumb:hover {
+      transform: scale(1.15);
+      box-shadow: 0 2px 14px rgba(124, 92, 255, 0.5);
+    }
+
+    /* ===== Share Button ===== */
+    .share-container {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .share-btn {
+      padding: 10px 20px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-bg-input);
+      color: var(--color-text-muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast),
+                  border-color var(--transition-fast);
+      min-height: 44px;
+      white-space: nowrap;
+    }
+
+    .share-btn:hover {
+      background: var(--color-bg-hover);
+      color: var(--color-text);
+      border-color: var(--color-accent);
+    }
+
+    .share-btn:active {
+      transform: scale(0.97);
+    }
+
+    .share-description {
+      margin: 6px 0 0;
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      text-align: center;
+      line-height: 1.4;
+      white-space: nowrap;
+    }
+
+    /* ===== Keyboard Shortcuts Help ===== */
+    .shortcuts-help {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 12px 16px 24px;
+      text-align: center;
+    }
+
+    .shortcuts-toggle {
+      padding: 8px 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: color var(--transition-fast), border-color var(--transition-fast);
+      min-height: 44px;
+    }
+
+    .shortcuts-toggle:hover {
+      color: var(--color-text);
+      border-color: var(--color-text-muted);
+    }
+
+    .shortcuts-list {
+      margin: 12px auto 0;
+      padding: 16px;
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      display: inline-flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+    }
+
+    .shortcuts-list[hidden] {
+      display: none;
+    }
+
+    .shortcut-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .shortcut-item dt {
+      min-width: 60px;
+    }
+
+    .shortcut-item dd {
+      margin: 0;
+      font-size: 0.82rem;
+      color: var(--color-text-muted);
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 3px 8px;
+      background: var(--color-bg-input);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.78rem;
+      color: var(--color-text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+
+    /* ===== Mobile Responsive (≤768px) ===== */
+    @media (max-width: 768px) {
+      .app-container {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        padding: 12px;
+      }
+
+      /* Reorder: Track A, Center, Track B */
+      #track-a { order: 1; }
+      .center-panel { order: 2; }
+      #track-b { order: 3; }
+
+      header h1 {
+        font-size: 1.25rem;
+      }
+
+      .track-panel {
+        padding: 16px;
+      }
+
+      .center-panel {
+        padding: 20px 16px;
+        gap: 20px;
+      }
+
+      /* Horizontal volume slider on mobile */
+      .volume-control {
+        flex-direction: row;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .volume-slider {
+        writing-mode: horizontal-tb;
+        direction: ltr;
+        min-height: 44px;
+        height: auto;
+        width: 100%;
+        min-width: unset;
+        padding: 16px 0;
+      }
+
+      .volume-slider::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 6px;
+      }
+
+      .volume-slider::-moz-range-track {
+        width: 100%;
+        height: 6px;
+      }
+
+      .volume-slider::-webkit-slider-thumb {
+        margin-top: -7px;
+        margin-left: 0;
+      }
+
+      .waveform-canvas {
+        height: 60px;
+      }
+
+      .transport-btn {
+        padding: 12px 20px;
+        font-size: 0.85rem;
+      }
+
+      .shortcuts-help {
+        padding: 8px 12px 20px;
+      }
+    }
+
+    /* ===== Small Mobile (≤480px) ===== */
+    @media (max-width: 480px) {
+      .track-url-controls {
+        flex-direction: column;
+      }
+
+      .load-btn {
+        width: 100%;
+      }
+
+      .transport-controls {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .transport-btn {
+        width: 100%;
+      }
+    }
+
+    /* ===== Focus Styles for Accessibility ===== */
+    :focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+
+    input[type="range"]:focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 4px;
+    }
+
+    /* ===== Reduced Motion ===== */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>WebCrossFader</h1>
+  </header>
+
+  <main class="app-container">
+    <!-- Track A (Left Panel) -->
+    <section id="track-a" class="track-panel" aria-label="Track A">
+      <h2 class="track-title">Track A</h2>
+
+      <div class="track-url-controls">
+        <label for="url-a" class="visually-hidden">Track A URL</label>
+        <input
+          type="text"
+          id="url-a"
+          class="url-input"
+          placeholder="音源URLを入力..."
+          aria-label="Track AのURL入力"
+        />
+        <button id="load-a" class="load-btn" aria-label="Track Aの音源を読み込む">読み込み</button>
+      </div>
+
+      <div id="loading-a" class="loading-indicator" hidden aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>読み込み中...</span>
+      </div>
+
+      <div id="error-a" class="error-display" hidden role="alert" aria-live="assertive"></div>
+
+      <div id="info-a" class="track-info" aria-label="Track Aの情報">
+        <span class="track-name"></span>
+        <span class="track-duration"></span>
+      </div>
+
+      <canvas id="waveform-a" class="waveform-canvas" width="300" height="100" aria-label="Track Aの波形表示"></canvas>
+
+      <div class="volume-control">
+        <label for="volume-a">音量</label>
+        <input
+          type="range"
+          id="volume-a"
+          class="volume-slider"
+          min="0"
+          max="1"
+          step="0.01"
+          value="1"
+          orient="vertical"
+          aria-label="Track Aの音量"
+          aria-valuemin="0"
+          aria-valuemax="1"
+          aria-valuenow="1"
+        />
+      </div>
+    </section>
+
+    <!-- Center Panel -->
+    <section class="center-panel" aria-label="再生コントロール">
+      <!-- Transport Controls -->
+      <div class="transport-controls" role="group" aria-label="トランスポートコントロール">
+        <button id="play-btn" class="transport-btn" disabled aria-label="再生/停止">
+          ▶ 再生
+        </button>
+        <button id="loop-btn" class="transport-btn" aria-label="ループ再生の切り替え" aria-pressed="false">
+          🔁 ループ
+        </button>
+      </div>
+
+      <!-- Progress Bar -->
+      <div class="progress-container" role="group" aria-label="再生進捗">
+        <input
+          type="range"
+          id="progress-bar"
+          class="progress-bar"
+          min="0"
+          max="100"
+          step="0.1"
+          value="0"
+          aria-label="再生位置"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        />
+        <div id="time-display" class="time-display" aria-live="off">
+          <span class="current-time">0:00</span>
+          <span class="time-separator">/</span>
+          <span class="total-time">0:00</span>
+        </div>
+      </div>
+
+      <!-- Crossfader -->
+      <div class="crossfader-container" role="group" aria-label="クロスフェーダー">
+        <button id="crossfade-to-a" class="crossfader-snap-btn crossfader-snap-a" aria-label="Track Aを100%にする">A</button>
+        <input
+          type="range"
+          id="crossfader"
+          class="crossfader"
+          min="0"
+          max="1"
+          step="0.01"
+          value="0.5"
+          aria-label="クロスフェーダー（左:Track A、右:Track B）"
+          aria-valuemin="0"
+          aria-valuemax="1"
+          aria-valuenow="0.5"
+        />
+        <button id="crossfade-to-b" class="crossfader-snap-btn crossfader-snap-b" aria-label="Track Bを100%にする">B</button>
+      </div>
+
+      <!-- Share Button -->
+      <div class="share-container">
+        <button id="share-btn" class="share-btn" aria-label="現在の音源設定を含む共有用URLをクリップボードにコピー" title="現在読み込んでいる音源の組み合わせを、他の人にも同じ状態で開けるURLとしてコピーします">
+          🔗 共有用URLをコピー
+        </button>
+        <p class="share-description">現在の音源込みで共有できるURLをクリップボードにコピーします</p>
+      </div>
+    </section>
+
+    <!-- Track B (Right Panel) -->
+    <section id="track-b" class="track-panel" aria-label="Track B">
+      <h2 class="track-title">Track B</h2>
+
+      <div class="track-url-controls">
+        <label for="url-b" class="visually-hidden">Track B URL</label>
+        <input
+          type="text"
+          id="url-b"
+          class="url-input"
+          placeholder="音源URLを入力..."
+          aria-label="Track BのURL入力"
+        />
+        <button id="load-b" class="load-btn" aria-label="Track Bの音源を読み込む">読み込み</button>
+      </div>
+
+      <div id="loading-b" class="loading-indicator" hidden aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>読み込み中...</span>
+      </div>
+
+      <div id="error-b" class="error-display" hidden role="alert" aria-live="assertive"></div>
+
+      <div id="info-b" class="track-info" aria-label="Track Bの情報">
+        <span class="track-name"></span>
+        <span class="track-duration"></span>
+      </div>
+
+      <canvas id="waveform-b" class="waveform-canvas" width="300" height="100" aria-label="Track Bの波形表示"></canvas>
+
+      <div class="volume-control">
+        <label for="volume-b">音量</label>
+        <input
+          type="range"
+          id="volume-b"
+          class="volume-slider"
+          min="0"
+          max="1"
+          step="0.01"
+          value="1"
+          orient="vertical"
+          aria-label="Track Bの音量"
+          aria-valuemin="0"
+          aria-valuemax="1"
+          aria-valuenow="1"
+        />
+      </div>
+    </section>
+  </main>
+
+  <!-- Keyboard Shortcuts Help -->
+  <aside id="shortcuts-help" class="shortcuts-help" aria-label="キーボードショートカット">
+    <button class="shortcuts-toggle" aria-expanded="false" aria-controls="shortcuts-list">
+      ⌨ キーボードショートカット
+    </button>
+    <dl id="shortcuts-list" class="shortcuts-list" hidden>
+      <div class="shortcut-item">
+        <dt><kbd>Space</kbd></dt>
+        <dd>再生 / 停止</dd>
+      </div>
+      <div class="shortcut-item">
+        <dt><kbd>←</kbd></dt>
+        <dd>クロスフェーダーを左へ（Track A寄り）</dd>
+      </div>
+      <div class="shortcut-item">
+        <dt><kbd>→</kbd></dt>
+        <dd>クロスフェーダーを右へ（Track B寄り）</dd>
+      </div>
+    </dl>
+  </aside>
+
+  <script>
+    // ============================================================
+    // Inlined Modules (from src/*.js - adapted for inline use)
+    // ============================================================
+
+    // --- audio-math.js ---
+    function calculateCrossfadeGains(crossfaderValue) {
+      return {
+        gainA: Math.cos(crossfaderValue * Math.PI / 2),
+        gainB: Math.sin(crossfaderValue * Math.PI / 2)
+      };
+    }
+
+    function calculateFinalVolume(volume, crossfadeGain) {
+      return volume * crossfadeGain;
+    }
+
+    function clampCrossfaderValue(value) {
+      return Math.max(0, Math.min(1, value));
+    }
+
+    // --- url-converter.js ---
+    const URLConverter = {
+      convert(url) {
+        const originalUrl = url;
+        if (this.isGoogleDriveUrl(url)) {
+          const fileId = this.extractGoogleDriveFileId(url);
+          if (fileId) {
+            return {
+              converted: 'https://drive.google.com/uc?export=download&id=' + fileId,
+              isConverted: true,
+              originalUrl,
+            };
+          }
+        }
+        if (this.isDropboxUrl(url)) {
+          const converted = this._convertDropboxUrl(url);
+          return {
+            converted,
+            isConverted: converted !== url,
+            originalUrl,
+          };
+        }
+        return { converted: url, isConverted: false, originalUrl };
+      },
+      isGoogleDriveUrl(url) {
+        return /^https?:\/\/drive\.google\.com\//i.test(url);
+      },
+      isDropboxUrl(url) {
+        return /^https?:\/\/(www\.)?dropbox\.com\//i.test(url);
+      },
+      extractGoogleDriveFileId(url) {
+        const filePattern = /\/file\/d\/([a-zA-Z0-9_-]+)/;
+        const fileMatch = url.match(filePattern);
+        if (fileMatch) return fileMatch[1];
+        const openPattern = /[?&]id=([a-zA-Z0-9_-]+)/;
+        const openMatch = url.match(openPattern);
+        if (openMatch) return openMatch[1];
+        return null;
+      },
+      _convertDropboxUrl(url) {
+        try {
+          const urlObj = new URL(url);
+          // www.dropbox.com を dl.dropboxusercontent.com に置換（CORS対応）
+          urlObj.hostname = 'dl.dropboxusercontent.com';
+          // dl パラメータは dropboxusercontent.com では不要なので削除
+          urlObj.searchParams.delete('dl');
+          return urlObj.toString();
+        } catch {
+          return url;
+        }
+      },
+    };
+
+    // --- share-manager.js ---
+    const ShareManager = {
+      getUrlParams(urlString) {
+        const href = urlString !== undefined ? urlString : window.location.href;
+        const url = new URL(href);
+        const params = url.searchParams;
+        return { trackAUrl: params.get('a') || null, trackBUrl: params.get('b') || null };
+      },
+      updateUrl(trackAUrl, trackBUrl) {
+        const url = new URL(window.location.href);
+        if (trackAUrl) { url.searchParams.set('a', trackAUrl); } else { url.searchParams.delete('a'); }
+        if (trackBUrl) { url.searchParams.set('b', trackBUrl); } else { url.searchParams.delete('b'); }
+        window.history.replaceState({}, '', url.toString());
+      },
+      generateShareUrl(trackAUrl, trackBUrl, baseUrl) {
+        const base = baseUrl !== undefined ? baseUrl : window.location.origin + window.location.pathname;
+        const url = new URL(base);
+        if (trackAUrl) { url.searchParams.set('a', trackAUrl); }
+        if (trackBUrl) { url.searchParams.set('b', trackBUrl); }
+        return url.toString();
+      },
+      async copyToClipboard(url) {
+        try { await navigator.clipboard.writeText(url); return true; } catch { return false; }
+      },
+    };
+
+    // --- keyboard-handler.js ---
+    const CROSSFADE_STEP = 0.05;
+
+    const KeyboardHandler = {
+      _handler: null,
+      register(callbacks) {
+        this.unregister();
+        this._handler = (e) => {
+          if (this.isInputFocused()) return;
+          switch (e.code) {
+            case 'Space': {
+              e.preventDefault();
+              callbacks.onTogglePlay();
+              break;
+            }
+            case 'ArrowLeft': {
+              e.preventDefault();
+              if (callbacks.getCrossfaderValue) {
+                const current = callbacks.getCrossfaderValue();
+                const newValue = clampCrossfaderValue(current - CROSSFADE_STEP);
+                callbacks.onCrossfadeLeft(newValue);
+              } else {
+                callbacks.onCrossfadeLeft();
+              }
+              break;
+            }
+            case 'ArrowRight': {
+              e.preventDefault();
+              if (callbacks.getCrossfaderValue) {
+                const current = callbacks.getCrossfaderValue();
+                const newValue = clampCrossfaderValue(current + CROSSFADE_STEP);
+                callbacks.onCrossfadeRight(newValue);
+              } else {
+                callbacks.onCrossfadeRight();
+              }
+              break;
+            }
+          }
+        };
+        document.addEventListener('keydown', this._handler);
+      },
+      isInputFocused() {
+        const activeElement = document.activeElement;
+        if (!activeElement) return false;
+        const tagName = activeElement.tagName.toLowerCase();
+        if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') return true;
+        if (activeElement.isContentEditable || activeElement.getAttribute('contenteditable') === 'true') return true;
+        return false;
+      },
+      unregister() {
+        if (this._handler) {
+          document.removeEventListener('keydown', this._handler);
+          this._handler = null;
+        }
+      }
+    };
+
+    // --- waveform-renderer.js ---
+    function calculatePositionFromClick(canvasWidth, canvasOffsetLeft, clientX) {
+      if (canvasWidth <= 0) return 0;
+      const position = (clientX - canvasOffsetLeft) / canvasWidth;
+      return Math.max(0, Math.min(1, position));
+    }
+
+    function downsampleBuffer(buffer, targetLength) {
+      const channelData = buffer.getChannelData(0);
+      const rawLength = channelData.length;
+      const blockSize = Math.floor(rawLength / targetLength);
+      const result = new Float32Array(targetLength);
+      for (let i = 0; i < targetLength; i++) {
+        const start = i * blockSize;
+        let max = 0;
+        for (let j = 0; j < blockSize; j++) {
+          const abs = Math.abs(channelData[start + j]);
+          if (abs > max) max = abs;
+        }
+        result[i] = max;
+      }
+      return result;
+    }
+
+    class WaveformRenderer {
+      _waveformImageData = null;
+      draw(canvas, buffer) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, width, height);
+        const waveformData = downsampleBuffer(buffer, width);
+        const centerY = height / 2;
+        ctx.fillStyle = '#00d4ff';
+        for (let i = 0; i < width; i++) {
+          const amplitude = waveformData[i];
+          const barHeight = amplitude * height * 0.8;
+          const y = centerY - barHeight / 2;
+          ctx.fillRect(i, y, 1, barHeight);
+        }
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.stroke();
+        this._waveformImageData = ctx.getImageData(0, 0, width, height);
+      }
+      updatePlayhead(canvas, progress) {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        if (this._waveformImageData) {
+          ctx.putImageData(this._waveformImageData, 0, 0);
+        }
+        const clampedProgress = Math.max(0, Math.min(1, progress));
+        const x = clampedProgress * width;
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      getPositionFromClick(canvas, clientX) {
+        const rect = canvas.getBoundingClientRect();
+        return calculatePositionFromClick(canvas.width, rect.left, clientX);
+      }
+    }
+
+    // --- audio-engine.js ---
+    const AudioErrorType = {
+      INVALID_URL: 'INVALID_URL',
+      NETWORK_ERROR: 'NETWORK_ERROR',
+      CORS_ERROR: 'CORS_ERROR',
+      DECODE_ERROR: 'DECODE_ERROR',
+      CONVERTED_URL_ERROR: 'CONVERTED_URL_ERROR',
+      AUDIO_CONTEXT_ERROR: 'AUDIO_CONTEXT_ERROR',
+    };
+
+    class AudioLoadError extends Error {
+      constructor(type, userMessage, cause) {
+        super(userMessage);
+        this.name = 'AudioLoadError';
+        this.type = type;
+        this.userMessage = userMessage;
+        if (cause) this.cause = cause;
+      }
+    }
+
+    function createLoadError(type, options) {
+      options = options || {};
+      const { originalUrl, convertedUrl, detail, cause } = options;
+      switch (type) {
+        case AudioErrorType.INVALID_URL:
+          return new AudioLoadError(type, '無効なURLです。正しいURLを入力してください。', cause);
+        case AudioErrorType.NETWORK_ERROR:
+          return new AudioLoadError(type, '音源の取得に失敗しました: ' + (detail || '不明なエラー'), cause);
+        case AudioErrorType.CORS_ERROR:
+          return new AudioLoadError(type, 'CORSエラー: このURLからの音源取得が許可されていません。', cause);
+        case AudioErrorType.DECODE_ERROR:
+          return new AudioLoadError(type, '音源のデコードに失敗しました。対応形式: WAV, MP3, FLAC, OGG', cause);
+        case AudioErrorType.CONVERTED_URL_ERROR:
+          return new AudioLoadError(type, '元のURL: ' + originalUrl + '\n変換後URL: ' + convertedUrl + '\n取得に失敗しました。', cause);
+        case AudioErrorType.AUDIO_CONTEXT_ERROR:
+          return new AudioLoadError(type, 'お使いのブラウザはWeb Audio APIに対応していません。', cause);
+        default:
+          return new AudioLoadError(type, '不明なエラーが発生しました。', cause);
+      }
+    }
+
+    function isValidUrl(url) {
+      try { new URL(url); return true; } catch { return false; }
+    }
+
+    function createTrackState() {
+      return { buffer: null, source: null, volumeGain: null, crossfadeGain: null, audioElement: null, mediaSource: null, useMediaElement: false };
+    }
+
+    function isPlayEnabled(trackALoaded, trackBLoaded) {
+      return trackALoaded && trackBLoaded;
+    }
+
+    class AudioEngine {
+      constructor() {
+        this.audioContext = null;
+        this.trackA = createTrackState();
+        this.trackB = createTrackState();
+        this._playbackState = { isPlaying: false, startedAt: 0, offset: 0 };
+        this._crossfadeValue = 0.5;
+        this._isLooping = false;
+        this.onPlaybackEnd = null;
+      }
+      async initialize() {
+        if (!this.audioContext) {
+          try { this.audioContext = new AudioContext(); }
+          catch (err) { throw createLoadError(AudioErrorType.AUDIO_CONTEXT_ERROR, { cause: err }); }
+        }
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
+        this._ensureGainNodes('A');
+        this._ensureGainNodes('B');
+        this.setCrossfade(this._crossfadeValue);
+      }
+      _ensureGainNodes(track) {
+        const t = track === 'A' ? this.trackA : this.trackB;
+        if (!this.audioContext) return;
+        if (!t.volumeGain) {
+          t.volumeGain = this.audioContext.createGain();
+          t.volumeGain.gain.value = 1.0;
+        }
+        if (!t.crossfadeGain) {
+          t.crossfadeGain = this.audioContext.createGain();
+        }
+        t.volumeGain.connect(t.crossfadeGain);
+        t.crossfadeGain.connect(this.audioContext.destination);
+      }
+      async loadTrack(track, url, originalUrl) {
+        if (!isValidUrl(url)) {
+          throw createLoadError(AudioErrorType.INVALID_URL);
+        }
+        if (!this.audioContext) {
+          await this.initialize();
+        }
+        let fetchError = null;
+        let isCorsError = false;
+        let response;
+        try {
+          response = await fetch(url);
+        } catch (err) {
+          if (err instanceof TypeError && err.message) {
+            const msg = err.message.toLowerCase();
+            if (msg.includes('cors') || msg.includes('blocked') || msg.includes('opaque') || msg.includes('failed to fetch')) {
+              isCorsError = true;
+              fetchError = err;
+            }
+          }
+          if (!isCorsError) {
+            if (originalUrl && originalUrl !== url) {
+              throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: err });
+            }
+            throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: err.message || '不明なネットワークエラー', cause: err });
+          }
+        }
+        if (!isCorsError && response) {
+          if (!response.ok) {
+            if (response.type === 'opaque') {
+              isCorsError = true;
+            } else {
+              if (originalUrl && originalUrl !== url) {
+                throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url });
+              }
+              throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: 'HTTP ' + response.status });
+            }
+          }
+        }
+        const t = track === 'A' ? this.trackA : this.trackB;
+        if (isCorsError) {
+          try {
+            return await this._loadTrackViaAudioElement(track, url);
+          } catch (fallbackErr) {
+            if (originalUrl && originalUrl !== url) {
+              throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: fetchError || fallbackErr });
+            }
+            throw createLoadError(AudioErrorType.CORS_ERROR, { cause: fetchError || fallbackErr });
+          }
+        }
+        let audioBuffer;
+        try {
+          const arrayBuffer = await response.arrayBuffer();
+          audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        } catch (err) {
+          throw createLoadError(AudioErrorType.DECODE_ERROR, { cause: err });
+        }
+        t.buffer = audioBuffer;
+        t.useMediaElement = false;
+        this._ensureGainNodes(track);
+        let name;
+        try {
+          const urlObj = new URL(url);
+          name = urlObj.pathname.split('/').pop() || url;
+        } catch { name = url; }
+        return { name, duration: audioBuffer.duration, sampleRate: audioBuffer.sampleRate, numberOfChannels: audioBuffer.numberOfChannels };
+      }
+      async _loadTrackViaAudioElement(track, url) {
+        const t = track === 'A' ? this.trackA : this.trackB;
+        if (t.audioElement) {
+          t.audioElement.pause();
+          t.audioElement.removeAttribute('src');
+          t.audioElement.load();
+        }
+        if (t.mediaSource) {
+          t.mediaSource.disconnect();
+          t.mediaSource = null;
+        }
+        const audio = new Audio();
+        audio.crossOrigin = 'anonymous';
+        audio.preload = 'auto';
+        const self = this;
+        return new Promise((resolve, reject) => {
+          const onCanPlay = () => {
+            cleanup();
+            t.audioElement = audio;
+            t.useMediaElement = true;
+            t.buffer = null;
+            self._ensureGainNodes(track);
+            t.mediaSource = self.audioContext.createMediaElementSource(audio);
+            t.mediaSource.connect(t.volumeGain);
+            let name;
+            try { const urlObj = new URL(url); name = urlObj.pathname.split('/').pop() || url; } catch { name = url; }
+            resolve({ name, duration: audio.duration, sampleRate: self.audioContext.sampleRate, numberOfChannels: 2 });
+          };
+          const onError = () => { cleanup(); reject(new Error('Audio element failed to load: ' + url)); };
+          const cleanup = () => { audio.removeEventListener('canplaythrough', onCanPlay); audio.removeEventListener('error', onError); };
+          audio.addEventListener('canplaythrough', onCanPlay);
+          audio.addEventListener('error', onError);
+          audio.src = url;
+        });
+      }
+      play(offset) {
+        if (offset === undefined) offset = 0;
+        if (!this.audioContext) return;
+        const trackAReady = this.trackA.buffer || this.trackA.useMediaElement;
+        const trackBReady = this.trackB.buffer || this.trackB.useMediaElement;
+        if (!trackAReady || !trackBReady) return;
+        this._stopSources();
+        const clampedOffset = Math.max(0, offset);
+        if (this.trackA.useMediaElement && this.trackA.audioElement) {
+          this.trackA.audioElement.currentTime = clampedOffset;
+          this.trackA.audioElement.play();
+        } else if (this.trackA.buffer) {
+          this.trackA.source = this.audioContext.createBufferSource();
+          this.trackA.source.buffer = this.trackA.buffer;
+          this.trackA.source.connect(this.trackA.volumeGain);
+          this.trackA.source.start(0, clampedOffset);
+        }
+        if (this.trackB.useMediaElement && this.trackB.audioElement) {
+          this.trackB.audioElement.currentTime = clampedOffset;
+          this.trackB.audioElement.play();
+        } else if (this.trackB.buffer) {
+          this.trackB.source = this.audioContext.createBufferSource();
+          this.trackB.source.buffer = this.trackB.buffer;
+          this.trackB.source.connect(this.trackB.volumeGain);
+          this.trackB.source.start(0, clampedOffset);
+        }
+        this._playbackState = { isPlaying: true, startedAt: this.audioContext.currentTime, offset: clampedOffset };
+      }
+      stop() {
+        const currentTime = this.getCurrentTime();
+        this._stopSources();
+        this._playbackState = { isPlaying: false, startedAt: 0, offset: currentTime };
+        return currentTime;
+      }
+      _stopSources() {
+        if (this.trackA.useMediaElement && this.trackA.audioElement) { this.trackA.audioElement.pause(); }
+        if (this.trackA.source) {
+          try { this.trackA.source.stop(); } catch {}
+          this.trackA.source.disconnect();
+          this.trackA.source = null;
+        }
+        if (this.trackB.useMediaElement && this.trackB.audioElement) { this.trackB.audioElement.pause(); }
+        if (this.trackB.source) {
+          try { this.trackB.source.stop(); } catch {}
+          this.trackB.source.disconnect();
+          this.trackB.source = null;
+        }
+      }
+      seek(position) {
+        const wasPlaying = this._playbackState.isPlaying;
+        if (wasPlaying) this._stopSources();
+        this._playbackState.offset = Math.max(0, position);
+        if (this.trackA.useMediaElement && this.trackA.audioElement) { this.trackA.audioElement.currentTime = this._playbackState.offset; }
+        if (this.trackB.useMediaElement && this.trackB.audioElement) { this.trackB.audioElement.currentTime = this._playbackState.offset; }
+        if (wasPlaying) this.play(this._playbackState.offset);
+      }
+      setCrossfade(value) {
+        this._crossfadeValue = value;
+        const { gainA, gainB } = calculateCrossfadeGains(value);
+        if (this.trackA.crossfadeGain && this.audioContext) {
+          this.trackA.crossfadeGain.gain.setValueAtTime(gainA, this.audioContext.currentTime);
+        }
+        if (this.trackB.crossfadeGain && this.audioContext) {
+          this.trackB.crossfadeGain.gain.setValueAtTime(gainB, this.audioContext.currentTime);
+        }
+      }
+      setVolume(track, value) {
+        const t = track === 'A' ? this.trackA : this.trackB;
+        if (t.volumeGain && this.audioContext) {
+          t.volumeGain.gain.setValueAtTime(value, this.audioContext.currentTime);
+        }
+      }
+      getCurrentTime() {
+        if (this._playbackState.isPlaying && this.audioContext) {
+          return this._playbackState.offset + (this.audioContext.currentTime - this._playbackState.startedAt);
+        }
+        return this._playbackState.offset;
+      }
+      setLooping(enabled) { this._isLooping = !!enabled; }
+      getIsLooping() { return this._isLooping; }
+      getDuration() {
+        let durationA = null;
+        if (this.trackA.buffer) { durationA = this.trackA.buffer.duration; }
+        else if (this.trackA.useMediaElement && this.trackA.audioElement) { durationA = this.trackA.audioElement.duration; }
+        let durationB = null;
+        if (this.trackB.buffer) { durationB = this.trackB.buffer.duration; }
+        else if (this.trackB.useMediaElement && this.trackB.audioElement) { durationB = this.trackB.audioElement.duration; }
+        if (durationA !== null && durationB !== null) return Math.min(durationA, durationB);
+        if (durationA !== null) return durationA;
+        if (durationB !== null) return durationB;
+        return 0;
+      }
+      dispose() {
+        this._stopSources();
+        for (const t of [this.trackA, this.trackB]) {
+          if (t.mediaSource) { t.mediaSource.disconnect(); t.mediaSource = null; }
+          if (t.audioElement) { t.audioElement.pause(); t.audioElement.removeAttribute('src'); t.audioElement.load(); t.audioElement = null; }
+          if (t.volumeGain) { t.volumeGain.disconnect(); t.volumeGain = null; }
+          if (t.crossfadeGain) { t.crossfadeGain.disconnect(); t.crossfadeGain = null; }
+          t.buffer = null;
+          t.useMediaElement = false;
+        }
+        if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
+        this._playbackState = { isPlaying: false, startedAt: 0, offset: 0 };
+        this._isLooping = false;
+        this.onPlaybackEnd = null;
+      }
+    }
+
+    // ============================================================
+    // AppState (Task 13.1)
+    // ============================================================
+    const AppState = {
+      trackA: {
+        url: '',
+        convertedUrl: null,
+        info: null,
+        volume: 1,
+        loadingState: 'idle',
+        error: null,
+      },
+      trackB: {
+        url: '',
+        convertedUrl: null,
+        info: null,
+        volume: 1,
+        loadingState: 'idle',
+        error: null,
+      },
+      crossfaderValue: 0.5,
+      playback: {
+        isPlaying: false,
+        currentTime: 0,
+        duration: 0,
+        startedAt: 0,
+      },
+      isLooping: false,
+    };
+
+    // ============================================================
+    // Global instances
+    // ============================================================
+    const audioEngine = new AudioEngine();
+    const waveformRendererA = new WaveformRenderer();
+    const waveformRendererB = new WaveformRenderer();
+    let animationFrameId = null;
+
+    // ============================================================
+    // Utility: format time as M:SS
+    // ============================================================
+    function formatTime(seconds) {
+      if (!isFinite(seconds) || seconds < 0) seconds = 0;
+      const totalSec = Math.floor(seconds);
+      const m = Math.floor(totalSec / 60);
+      const s = totalSec % 60;
+      return m + ':' + String(s).padStart(2, '0');
+    }
+
+    // ============================================================
+    // UI Module (Task 13.1)
+    // ============================================================
+    const UI = {
+      // DOM element references (cached on initialize)
+      els: {},
+
+      initialize() {
+        this.els = {
+          urlA: document.getElementById('url-a'),
+          urlB: document.getElementById('url-b'),
+          loadA: document.getElementById('load-a'),
+          loadB: document.getElementById('load-b'),
+          loadingA: document.getElementById('loading-a'),
+          loadingB: document.getElementById('loading-b'),
+          errorA: document.getElementById('error-a'),
+          errorB: document.getElementById('error-b'),
+          infoA: document.getElementById('info-a'),
+          infoB: document.getElementById('info-b'),
+          waveformA: document.getElementById('waveform-a'),
+          waveformB: document.getElementById('waveform-b'),
+          volumeA: document.getElementById('volume-a'),
+          volumeB: document.getElementById('volume-b'),
+          playBtn: document.getElementById('play-btn'),
+          loopBtn: document.getElementById('loop-btn'),
+          progressBar: document.getElementById('progress-bar'),
+          currentTimeEl: document.querySelector('#time-display .current-time'),
+          totalTimeEl: document.querySelector('#time-display .total-time'),
+          crossfader: document.getElementById('crossfader'),
+          crossfadeToA: document.getElementById('crossfade-to-a'),
+          crossfadeToB: document.getElementById('crossfade-to-b'),
+          shareBtn: document.getElementById('share-btn'),
+          shortcutsToggle: document.querySelector('.shortcuts-toggle'),
+          shortcutsList: document.getElementById('shortcuts-list'),
+        };
+
+        // Resize waveform canvases to match container width
+        this._resizeCanvas(this.els.waveformA);
+        this._resizeCanvas(this.els.waveformB);
+      },
+
+      _resizeCanvas(canvas) {
+        const containerWidth = canvas.parentElement.clientWidth;
+        if (containerWidth > 0) {
+          canvas.width = containerWidth;
+        }
+      },
+
+      updateTrackInfo(track, info) {
+        const infoEl = track === 'A' ? this.els.infoA : this.els.infoB;
+        const nameEl = infoEl.querySelector('.track-name');
+        const durationEl = infoEl.querySelector('.track-duration');
+        if (info) {
+          nameEl.textContent = decodeURIComponent(info.name);
+          durationEl.textContent = formatTime(info.duration);
+        } else {
+          nameEl.textContent = '';
+          durationEl.textContent = '';
+        }
+      },
+
+      setLoading(track, loading) {
+        const loadingEl = track === 'A' ? this.els.loadingA : this.els.loadingB;
+        const loadBtn = track === 'A' ? this.els.loadA : this.els.loadB;
+        if (loading) {
+          loadingEl.hidden = false;
+          loadBtn.disabled = true;
+        } else {
+          loadingEl.hidden = true;
+          loadBtn.disabled = false;
+        }
+      },
+
+      showError(track, message) {
+        const errorEl = track === 'A' ? this.els.errorA : this.els.errorB;
+        if (message) {
+          errorEl.textContent = message;
+          errorEl.hidden = false;
+        } else {
+          errorEl.textContent = '';
+          errorEl.hidden = true;
+        }
+      },
+
+      updatePlayState(isPlaying) {
+        this.els.playBtn.textContent = isPlaying ? '⏹ 停止' : '▶ 再生';
+        this.els.playBtn.setAttribute('aria-label', isPlaying ? '停止' : '再生/停止');
+      },
+
+      updateProgress(currentTime, duration) {
+        if (duration > 0) {
+          this.els.progressBar.max = duration;
+          this.els.progressBar.value = currentTime;
+          this.els.progressBar.setAttribute('aria-valuenow', currentTime.toFixed(1));
+          this.els.progressBar.setAttribute('aria-valuemax', duration.toFixed(1));
+        }
+        this.els.currentTimeEl.textContent = formatTime(currentTime);
+        this.els.totalTimeEl.textContent = formatTime(duration);
+      },
+
+      updateLoopState(isLooping) {
+        this.els.loopBtn.setAttribute('aria-pressed', isLooping ? 'true' : 'false');
+      },
+
+      setTransportEnabled(enabled) {
+        this.els.playBtn.disabled = !enabled;
+      },
+    };
+
+    // ============================================================
+    // Event Handlers (Task 13.2)
+    // ============================================================
+
+    async function handleLoadTrack(track) {
+      // Ensure AudioContext is initialized on user interaction
+      try {
+        await audioEngine.initialize();
+      } catch (err) {
+        UI.showError(track, err.userMessage || err.message);
+        return;
+      }
+
+      const urlInput = track === 'A' ? UI.els.urlA : UI.els.urlB;
+      const rawUrl = urlInput.value.trim();
+      if (!rawUrl) return;
+
+      const trackState = track === 'A' ? AppState.trackA : AppState.trackB;
+
+      // Clear previous error
+      UI.showError(track, null);
+
+      // Convert URL
+      const { converted, isConverted, originalUrl } = URLConverter.convert(rawUrl);
+      trackState.url = rawUrl;
+      trackState.convertedUrl = isConverted ? converted : null;
+
+      // Set loading state
+      trackState.loadingState = 'loading';
+      UI.setLoading(track, true);
+
+      try {
+        const info = await audioEngine.loadTrack(track, converted, isConverted ? originalUrl : undefined);
+        trackState.info = info;
+        trackState.loadingState = 'loaded';
+        UI.setLoading(track, false);
+        UI.updateTrackInfo(track, info);
+
+        // Draw waveform
+        const canvas = track === 'A' ? UI.els.waveformA : UI.els.waveformB;
+        UI._resizeCanvas(canvas);
+        const buffer = track === 'A' ? audioEngine.trackA.buffer : audioEngine.trackB.buffer;
+        const renderer = track === 'A' ? waveformRendererA : waveformRendererB;
+        if (buffer) {
+          renderer.draw(canvas, buffer);
+        }
+
+        // Update transport enabled state
+        const bothLoaded = isPlayEnabled(
+          AppState.trackA.loadingState === 'loaded',
+          AppState.trackB.loadingState === 'loaded'
+        );
+        UI.setTransportEnabled(bothLoaded);
+
+        // Update progress bar max to audio duration when both tracks loaded
+        if (bothLoaded) {
+          const duration = audioEngine.getDuration();
+          AppState.playback.duration = duration;
+          UI.updateProgress(0, duration);
+        }
+
+        // Update browser URL
+        ShareManager.updateUrl(
+          AppState.trackA.loadingState === 'loaded' ? AppState.trackA.url : null,
+          AppState.trackB.loadingState === 'loaded' ? AppState.trackB.url : null
+        );
+      } catch (err) {
+        trackState.loadingState = 'error';
+        trackState.error = err.userMessage || err.message;
+        UI.setLoading(track, false);
+        UI.showError(track, trackState.error);
+      }
+    }
+
+    function handleTogglePlay() {
+      if (!isPlayEnabled(
+        AppState.trackA.loadingState === 'loaded',
+        AppState.trackB.loadingState === 'loaded'
+      )) return;
+
+      if (AppState.playback.isPlaying) {
+        // Stop
+        const currentTime = audioEngine.stop();
+        AppState.playback.isPlaying = false;
+        AppState.playback.currentTime = currentTime;
+        UI.updatePlayState(false);
+        stopAnimationLoop();
+      } else {
+        // Play
+        audioEngine.play(AppState.playback.currentTime);
+        AppState.playback.isPlaying = true;
+        UI.updatePlayState(true);
+        startAnimationLoop();
+      }
+    }
+
+    function handleCrossfadeChange(value) {
+      const v = parseFloat(value);
+      AppState.crossfaderValue = v;
+      audioEngine.setCrossfade(v);
+      UI.els.crossfader.value = v;
+      UI.els.crossfader.setAttribute('aria-valuenow', v);
+    }
+
+    function handleVolumeChange(track, value) {
+      const v = parseFloat(value);
+      const trackState = track === 'A' ? AppState.trackA : AppState.trackB;
+      trackState.volume = v;
+      audioEngine.setVolume(track, v);
+    }
+
+    function handleProgressSeek(value) {
+      const position = parseFloat(value);
+      AppState.playback.currentTime = position;
+      audioEngine.seek(position);
+      const duration = audioEngine.getDuration();
+      UI.updateProgress(position, duration);
+
+      // Update waveform playheads
+      if (duration > 0) {
+        const progress = position / duration;
+        waveformRendererA.updatePlayhead(UI.els.waveformA, progress);
+        waveformRendererB.updatePlayhead(UI.els.waveformB, progress);
+      }
+    }
+
+    function handleLoopToggle() {
+      AppState.isLooping = !AppState.isLooping;
+      audioEngine.setLooping(AppState.isLooping);
+      UI.updateLoopState(AppState.isLooping);
+    }
+
+    async function handleShare() {
+      const shareUrl = ShareManager.generateShareUrl(
+        AppState.trackA.loadingState === 'loaded' ? AppState.trackA.url : null,
+        AppState.trackB.loadingState === 'loaded' ? AppState.trackB.url : null
+      );
+      const success = await ShareManager.copyToClipboard(shareUrl);
+      const shareBtn = UI.els.shareBtn;
+      const originalText = shareBtn.textContent;
+      if (success) {
+        shareBtn.textContent = '✅ コピーしました!';
+      } else {
+        shareBtn.textContent = '❌ コピーに失敗しました';
+      }
+      setTimeout(() => {
+        shareBtn.textContent = originalText;
+      }, 2000);
+    }
+
+    function handleWaveformClick(track, event) {
+      const canvas = track === 'A' ? UI.els.waveformA : UI.els.waveformB;
+      const renderer = track === 'A' ? waveformRendererA : waveformRendererB;
+      const position = renderer.getPositionFromClick(canvas, event.clientX);
+      const duration = audioEngine.getDuration();
+      if (duration > 0) {
+        const seekTime = position * duration;
+        handleProgressSeek(seekTime);
+      }
+    }
+
+    // ============================================================
+    // Animation Loop (Task 13.3)
+    // ============================================================
+
+    function startAnimationLoop() {
+      if (animationFrameId) return;
+      function tick() {
+        if (!AppState.playback.isPlaying) {
+          animationFrameId = null;
+          return;
+        }
+
+        const currentTime = audioEngine.getCurrentTime();
+        const duration = audioEngine.getDuration();
+
+        // End-of-track detection
+        if (duration > 0 && currentTime >= duration) {
+          if (AppState.isLooping) {
+            // Loop: restart from beginning
+            audioEngine.stop();
+            AppState.playback.currentTime = 0;
+            audioEngine.play(0);
+            AppState.playback.isPlaying = true;
+          } else {
+            // Stop: reset to beginning
+            audioEngine.stop();
+            AppState.playback.isPlaying = false;
+            AppState.playback.currentTime = 0;
+            UI.updatePlayState(false);
+            UI.updateProgress(0, duration);
+            waveformRendererA.updatePlayhead(UI.els.waveformA, 0);
+            waveformRendererB.updatePlayhead(UI.els.waveformB, 0);
+            animationFrameId = null;
+            return;
+          }
+        }
+
+        // Update progress bar and time display
+        const displayTime = Math.min(currentTime, duration);
+        AppState.playback.currentTime = displayTime;
+        UI.updateProgress(displayTime, duration);
+
+        // Update waveform playheads
+        if (duration > 0) {
+          const progress = displayTime / duration;
+          waveformRendererA.updatePlayhead(UI.els.waveformA, progress);
+          waveformRendererB.updatePlayhead(UI.els.waveformB, progress);
+        }
+
+        animationFrameId = requestAnimationFrame(tick);
+      }
+      animationFrameId = requestAnimationFrame(tick);
+    }
+
+    function stopAnimationLoop() {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+    }
+
+    // ============================================================
+    // Application Initialization (Task 14.1 & 14.2)
+    // ============================================================
+
+    function initApp() {
+      // Initialize UI module
+      UI.initialize();
+
+      // --- Event Listeners (Task 13.2) ---
+
+      // Load buttons
+      UI.els.loadA.addEventListener('click', () => handleLoadTrack('A'));
+      UI.els.loadB.addEventListener('click', () => handleLoadTrack('B'));
+
+      // Allow Enter key in URL inputs to trigger load
+      UI.els.urlA.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleLoadTrack('A');
+      });
+      UI.els.urlB.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') handleLoadTrack('B');
+      });
+
+      // Play/Stop button
+      UI.els.playBtn.addEventListener('click', handleTogglePlay);
+
+      // Loop button
+      UI.els.loopBtn.addEventListener('click', handleLoopToggle);
+
+      // Crossfader
+      UI.els.crossfader.addEventListener('input', (e) => {
+        handleCrossfadeChange(e.target.value);
+      });
+
+      // Crossfader snap buttons (A=100%, B=100%)
+      UI.els.crossfadeToA.addEventListener('click', () => {
+        handleCrossfadeChange(0);
+      });
+      UI.els.crossfadeToB.addEventListener('click', () => {
+        handleCrossfadeChange(1);
+      });
+
+      // Volume sliders
+      UI.els.volumeA.addEventListener('input', (e) => {
+        handleVolumeChange('A', e.target.value);
+      });
+      UI.els.volumeB.addEventListener('input', (e) => {
+        handleVolumeChange('B', e.target.value);
+      });
+
+      // Progress bar
+      UI.els.progressBar.addEventListener('input', (e) => {
+        handleProgressSeek(e.target.value);
+      });
+
+      // Share button
+      UI.els.shareBtn.addEventListener('click', handleShare);
+
+      // Waveform clicks
+      UI.els.waveformA.addEventListener('click', (e) => handleWaveformClick('A', e));
+      UI.els.waveformB.addEventListener('click', (e) => handleWaveformClick('B', e));
+
+      // Keyboard shortcuts help toggle
+      UI.els.shortcutsToggle.addEventListener('click', () => {
+        const list = UI.els.shortcutsList;
+        const isHidden = list.hidden;
+        list.hidden = !isHidden;
+        UI.els.shortcutsToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      });
+
+      // --- Register Keyboard Handler (Task 14.1) ---
+      KeyboardHandler.register({
+        onTogglePlay: handleTogglePlay,
+        onCrossfadeLeft: (newValue) => {
+          handleCrossfadeChange(newValue);
+        },
+        onCrossfadeRight: (newValue) => {
+          handleCrossfadeChange(newValue);
+        },
+        getCrossfaderValue: () => AppState.crossfaderValue,
+      });
+
+      // --- Handle window resize for waveform canvases ---
+      window.addEventListener('resize', () => {
+        UI._resizeCanvas(UI.els.waveformA);
+        UI._resizeCanvas(UI.els.waveformB);
+        // Redraw waveforms if buffers exist
+        if (audioEngine.trackA.buffer) {
+          waveformRendererA.draw(UI.els.waveformA, audioEngine.trackA.buffer);
+        }
+        if (audioEngine.trackB.buffer) {
+          waveformRendererB.draw(UI.els.waveformB, audioEngine.trackB.buffer);
+        }
+      });
+
+      // --- URL Query Parameter Auto-Load (Task 14.2) ---
+      const params = ShareManager.getUrlParams();
+      if (params.trackAUrl) {
+        UI.els.urlA.value = params.trackAUrl;
+      }
+      if (params.trackBUrl) {
+        UI.els.urlB.value = params.trackBUrl;
+      }
+      // Auto-load tracks if URL params are present
+      // AudioContext requires a user gesture, so we register a one-time click handler
+      // that initializes AudioContext and then loads the tracks
+      if (params.trackAUrl || params.trackBUrl) {
+        const autoLoadOverlay = document.createElement('div');
+        autoLoadOverlay.id = 'auto-load-overlay';
+        autoLoadOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,13,26,0.92);display:flex;align-items:center;justify-content:center;z-index:1000;cursor:pointer;padding:24px;';
+
+        let urlListHtml = '';
+        if (params.trackAUrl) {
+          urlListHtml += '<p style="font-size:0.82rem;color:#8888aa;margin:4px 0;word-break:break-all;"><strong style="color:#00d4ff;">Track A:</strong> ' + params.trackAUrl.replace(/</g, '&lt;') + '</p>';
+        }
+        if (params.trackBUrl) {
+          urlListHtml += '<p style="font-size:0.82rem;color:#8888aa;margin:4px 0;word-break:break-all;"><strong style="color:#ff6b9d;">Track B:</strong> ' + params.trackBUrl.replace(/</g, '&lt;') + '</p>';
+        }
+
+        autoLoadOverlay.innerHTML =
+          '<div style="text-align:center;color:#e0e0f0;max-width:600px;">' +
+            '<p style="font-size:1.3rem;margin-bottom:8px;">🎵 WebCrossFader</p>' +
+            '<p style="font-size:0.95rem;color:#8888aa;margin-bottom:16px;">クロスフェード再生用の音源として、ネットワーク上のファイルを読み込みます。</p>' +
+            '<div style="background:rgba(26,26,53,0.8);border:1px solid #2a2a4a;border-radius:8px;padding:12px 16px;margin-bottom:20px;text-align:left;">' +
+              urlListHtml +
+            '</div>' +
+            '<p style="font-size:1rem;color:#e0e0f0;padding:10px 28px;display:inline-block;border:1px solid #7c5cff;border-radius:8px;background:rgba(124,92,255,0.12);">▶ クリックして読み込みを開始</p>' +
+          '</div>';
+        document.body.appendChild(autoLoadOverlay);
+
+        const startAutoLoad = async () => {
+          autoLoadOverlay.remove();
+          if (params.trackAUrl) {
+            await handleLoadTrack('A');
+          }
+          if (params.trackBUrl) {
+            await handleLoadTrack('B');
+          }
+        };
+        autoLoadOverlay.addEventListener('click', startAutoLoad, { once: true });
+      }
+    }
+
+    // Start the application when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
+  </script>
+</body>
+</html>
