@@ -1561,12 +1561,12 @@
         try {
           response = await fetch(url);
         } catch (err) {
-          if (err instanceof TypeError && err.message) {
-            const msg = err.message.toLowerCase();
-            if (msg.includes('cors') || msg.includes('blocked') || msg.includes('opaque') || msg.includes('failed to fetch')) {
-              isCorsError = true;
-              fetchError = err;
-            }
+          // TypeError はブラウザによってメッセージが異なる
+          // (Chrome: "Failed to fetch", Safari/WebKit: "Load failed" 等)
+          // TypeError であれば常にCORSフォールバックを試行する
+          if (err instanceof TypeError) {
+            isCorsError = true;
+            fetchError = err;
           }
           if (!isCorsError) {
             if (originalUrl && originalUrl !== url) {
