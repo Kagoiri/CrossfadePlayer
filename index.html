@@ -915,6 +915,9 @@
     <section class="center-panel" aria-label="再生コントロール">
       <!-- Transport Controls -->
       <div class="transport-controls" role="group" aria-label="トランスポートコントロール">
+        <button id="seek-start-btn" class="transport-btn" aria-label="先頭に戻る">
+          ⏮ 先頭
+        </button>
         <button id="play-btn" class="transport-btn" disabled aria-label="再生/停止">
           ▶ 再生
         </button>
@@ -1268,7 +1271,7 @@
       }
       getPositionFromClick(canvas, clientX) {
         const rect = canvas.getBoundingClientRect();
-        return calculatePositionFromClick(canvas.width, rect.left, clientX);
+        return calculatePositionFromClick(rect.width, rect.left, clientX);
       }
     }
 
@@ -1644,6 +1647,7 @@
           volumeA: document.getElementById('volume-a'),
           volumeB: document.getElementById('volume-b'),
           playBtn: document.getElementById('play-btn'),
+          seekStartBtn: document.getElementById('seek-start-btn'),
           loopBtn: document.getElementById('loop-btn'),
           progressBar: document.getElementById('progress-bar'),
           currentTimeEl: document.querySelector('#time-display .current-time'),
@@ -1782,6 +1786,16 @@
           AppState.trackB.loadingState === 'loaded'
         );
         UI.setTransportEnabled(bothLoaded);
+
+        // Reset playback position to start when a new track is loaded
+        if (AppState.playback.isPlaying) {
+          audioEngine.stop();
+          AppState.playback.isPlaying = false;
+          UI.updatePlayState(false);
+          stopAnimationLoop();
+        }
+        AppState.playback.currentTime = 0;
+        audioEngine._playbackState.offset = 0;
 
         // Update progress bar max to audio duration when both tracks loaded
         if (bothLoaded) {
@@ -1975,6 +1989,11 @@
 
       // Play/Stop button
       UI.els.playBtn.addEventListener('click', handleTogglePlay);
+
+      // Seek to start button
+      UI.els.seekStartBtn.addEventListener('click', () => {
+        handleProgressSeek(0);
+      });
 
       // Loop button
       UI.els.loopBtn.addEventListener('click', handleLoopToggle);
