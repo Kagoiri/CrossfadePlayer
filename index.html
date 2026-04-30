@@ -1298,7 +1298,7 @@
         case AudioErrorType.NETWORK_ERROR:
           return new AudioLoadError(type, '音源の取得に失敗しました: ' + (detail || '不明なエラー'), cause);
         case AudioErrorType.CORS_ERROR:
-          return new AudioLoadError(type, 'CORSエラー: このURLからの音源取得が許可されていません。', cause);
+          return new AudioLoadError(type, '音源の取得が拒否されました。このサーバーはブラウザからの直接アクセスを許可していない可能性があります（CORS制限）。CORSに対応したサーバー上の直接リンクをご利用ください。', cause);
         case AudioErrorType.DECODE_ERROR:
           return new AudioLoadError(type, '音源のデコードに失敗しました。対応形式: WAV, MP3, FLAC, OGG', cause);
         case AudioErrorType.CONVERTED_URL_ERROR:
@@ -1395,7 +1395,11 @@
               if (originalUrl && originalUrl !== url) {
                 throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url });
               }
-              throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: 'HTTP ' + response.status });
+              const statusMsg = response.status === 404 ? 'ファイルが見つかりません（404）。URLが正しいか確認してください。'
+                : response.status === 403 ? 'アクセスが拒否されました（403）。ファイルの共有設定を確認してください。'
+                : response.status === 500 ? 'サーバーエラー（500）。しばらく待ってから再試行してください。'
+                : 'HTTP ' + response.status;
+              throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: statusMsg });
             }
           }
         }
@@ -1412,9 +1416,20 @@
         }
         let audioBuffer;
         try {
+          // Content-Typeが音声でない場合を検出（HTMLページが返された場合など）
+          const contentType = response.headers.get('content-type') || '';
           const arrayBuffer = await response.arrayBuffer();
+          if (!contentType.startsWith('audio/') && !contentType.startsWith('application/ogg') && !contentType.startsWith('application/octet-stream')) {
+            // HTMLが返された場合（リダイレクト先がログインページ等）
+            if (contentType.includes('text/html')) {
+              throw createLoadError(AudioErrorType.NETWORK_ERROR, {
+                detail: '音声ファイルではなくHTMLページが返されました。URLが音声ファイルへの直接リンクであることを確認してください。'
+              });
+            }
+          }
           audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
         } catch (err) {
+          if (err instanceof AudioLoadError) throw err;
           throw createLoadError(AudioErrorType.DECODE_ERROR, { cause: err });
         }
         t.buffer = audioBuffer;
@@ -1808,6 +1823,12 @@
       const urlInput = track === 'A' ? UI.els.urlA : UI.els.urlB;
       const rawUrl = urlInput.value.trim();
       if (!rawUrl) return;
+
+      // Google Drive URLの検出 — 非対応であることを通知
+      if (/^https?:\/\/drive\.google\.com\//i.test(rawUrl)) {
+        UI.showError(track, 'Google Driveの共有リンクには対応していません。Dropboxや、CORSに対応したサーバー上の直接リンクをご利用ください。');
+        return;
+      }
 
       const trackState = track === 'A' ? AppState.trackA : AppState.trackB;
 
