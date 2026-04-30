@@ -1094,7 +1094,7 @@
           const fileId = this.extractGoogleDriveFileId(url);
           if (fileId) {
             return {
-              converted: 'https://drive.google.com/uc?export=download&id=' + fileId,
+              converted: 'https://drive.usercontent.google.com/download?id=' + fileId + '&export=download',
               isConverted: true,
               originalUrl,
             };
@@ -1339,7 +1339,7 @@
     }
 
     function createTrackState() {
-      return { buffer: null, source: null, volumeGain: null, crossfadeGain: null, audioElement: null, mediaSource: null, useMediaElement: false };
+      return { buffer: null, source: null, volumeGain: null, crossfadeGain: null, audioElement: null, mediaSource: null, useMediaElement: false, noCorsMode: false };
     }
 
     function isPlayEnabled(trackALoaded, trackBLoaded) {
@@ -1353,6 +1353,8 @@
         this.trackB = createTrackState();
         this._playbackState = { isPlaying: false, startedAt: 0, offset: 0 };
         this._crossfadeValue = 0.5;
+        this._volumeA = 1;
+        this._volumeB = 1;
         this._isLooping = false;
         this.onPlaybackEnd = null;
       }
@@ -1388,6 +1390,21 @@
         if (!this.audioContext) {
           await this.initialize();
         }
+
+        const isFileProtocol = window.location.protocol === 'file:';
+
+        // file:// プロトコルの場合、fetch() は使えないので <audio> 要素で直接読み込む
+        if (isFileProtocol) {
+          try {
+            return await this._tryLoadAudioElement(track, url, false);
+          } catch (err) {
+            if (originalUrl && originalUrl !== url) {
+              throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: err });
+            }
+            throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: err.message || '読み込みに失敗しました', cause: err });
+          }
+        }
+
         let fetchError = null;
         let isCorsError = false;
         let response;
@@ -1422,13 +1439,19 @@
         }
         const t = track === 'A' ? this.trackA : this.trackB;
         if (isCorsError) {
+          // Strategy 1: <audio> element fallback (with and without CORS)
           try {
             return await this._loadTrackViaAudioElement(track, url);
-          } catch (fallbackErr) {
-            if (originalUrl && originalUrl !== url) {
-              throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: fetchError || fallbackErr });
+          } catch (audioElErr) {
+            // Strategy 2: CORS proxy fallback
+            try {
+              return await this._loadTrackViaCorsProxy(track, url);
+            } catch (proxyErr) {
+              if (originalUrl && originalUrl !== url) {
+                throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: fetchError || proxyErr });
+              }
+              throw createLoadError(AudioErrorType.CORS_ERROR, { cause: fetchError || proxyErr });
             }
-            throw createLoadError(AudioErrorType.CORS_ERROR, { cause: fetchError || fallbackErr });
           }
         }
         let audioBuffer;
@@ -1454,34 +1477,110 @@
           t.audioElement.pause();
           t.audioElement.removeAttribute('src');
           t.audioElement.load();
+          if (t.audioElement.parentNode) t.audioElement.parentNode.removeChild(t.audioElement);
         }
         if (t.mediaSource) {
           t.mediaSource.disconnect();
           t.mediaSource = null;
         }
-        const audio = new Audio();
-        audio.crossOrigin = 'anonymous';
+
+        // まず crossOrigin='anonymous' で試行（成功すれば MediaElementAudioSourceNode 接続可能）
+        try {
+          return await this._tryLoadAudioElement(track, url, true);
+        } catch {
+          // CORS非対応の場合、crossOrigin なしで再試行
+          // （Web Audio グラフには接続できないが、audio.volume で音量制御）
+          return await this._tryLoadAudioElement(track, url, false);
+        }
+      }
+      async _tryLoadAudioElement(track, url, useCors) {
+        const t = track === 'A' ? this.trackA : this.trackB;
+        const audio = document.createElement('audio');
+        if (useCors) {
+          audio.crossOrigin = 'anonymous';
+        }
         audio.preload = 'auto';
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
         const self = this;
         return new Promise((resolve, reject) => {
-          const onCanPlay = () => {
+          let settled = false;
+          const timeoutId = setTimeout(() => {
+            if (!settled) { settled = true; cleanup(); document.body.removeChild(audio); reject(new Error('Audio element load timeout: ' + url)); }
+          }, 15000);
+          const onReady = () => {
+            if (settled) return;
+            if (!isFinite(audio.duration) || audio.duration <= 0) return;
+            settled = true;
+            clearTimeout(timeoutId);
             cleanup();
+            // DOMに残す（再生に必要）
             t.audioElement = audio;
             t.useMediaElement = true;
             t.buffer = null;
             self._ensureGainNodes(track);
-            t.mediaSource = self.audioContext.createMediaElementSource(audio);
-            t.mediaSource.connect(t.volumeGain);
+            if (useCors) {
+              t.mediaSource = self.audioContext.createMediaElementSource(audio);
+              t.mediaSource.connect(t.volumeGain);
+              t.noCorsMode = false;
+            } else {
+              t.mediaSource = null;
+              t.noCorsMode = true;
+            }
             let name;
             try { const urlObj = new URL(url); name = urlObj.pathname.split('/').pop() || url; } catch { name = url; }
             resolve({ name, duration: audio.duration, sampleRate: self.audioContext.sampleRate, numberOfChannels: 2 });
           };
-          const onError = () => { cleanup(); reject(new Error('Audio element failed to load: ' + url)); };
-          const cleanup = () => { audio.removeEventListener('canplaythrough', onCanPlay); audio.removeEventListener('error', onError); };
-          audio.addEventListener('canplaythrough', onCanPlay);
+          const onError = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            cleanup();
+            document.body.removeChild(audio);
+            reject(new Error('Audio element failed to load: ' + url));
+          };
+          const cleanup = () => {
+            audio.removeEventListener('canplaythrough', onReady);
+            audio.removeEventListener('loadedmetadata', onReady);
+            audio.removeEventListener('durationchange', onReady);
+            audio.removeEventListener('error', onError);
+          };
+          audio.addEventListener('canplaythrough', onReady);
+          audio.addEventListener('loadedmetadata', onReady);
+          audio.addEventListener('durationchange', onReady);
           audio.addEventListener('error', onError);
           audio.src = url;
+          audio.load();
         });
+      }
+      async _loadTrackViaCorsProxy(track, url) {
+        // CORSプロキシ経由でfetchし、AudioBufferとしてデコード
+        const CORS_PROXIES = [
+          (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+          (u) => 'https://corsproxy.io/?' + encodeURIComponent(u),
+        ];
+        let lastErr = null;
+        for (const makeProxyUrl of CORS_PROXIES) {
+          const proxyUrl = makeProxyUrl(url);
+          try {
+            const response = await fetch(proxyUrl);
+            if (!response.ok) { lastErr = new Error('Proxy HTTP ' + response.status); continue; }
+            const arrayBuffer = await response.arrayBuffer();
+            if (arrayBuffer.byteLength < 100) { lastErr = new Error('Proxy returned empty response'); continue; }
+            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+            const t = track === 'A' ? this.trackA : this.trackB;
+            t.buffer = audioBuffer;
+            t.useMediaElement = false;
+            t.noCorsMode = false;
+            this._ensureGainNodes(track);
+            let name;
+            try { const urlObj = new URL(url); name = urlObj.pathname.split('/').pop() || url; } catch { name = url; }
+            return { name, duration: audioBuffer.duration, sampleRate: audioBuffer.sampleRate, numberOfChannels: audioBuffer.numberOfChannels };
+          } catch (err) {
+            lastErr = err;
+          }
+        }
+        throw lastErr || new Error('All CORS proxies failed for: ' + url);
       }
       play(offset) {
         if (offset === undefined) offset = 0;
@@ -1548,11 +1647,25 @@
         if (this.trackB.crossfadeGain && this.audioContext) {
           this.trackB.crossfadeGain.gain.setValueAtTime(gainB, this.audioContext.currentTime);
         }
+        // noCorsMode トラックは audio.volume で直接制御
+        this._updateNoCorsVolume();
       }
       setVolume(track, value) {
         const t = track === 'A' ? this.trackA : this.trackB;
+        if (track === 'A') { this._volumeA = value; } else { this._volumeB = value; }
         if (t.volumeGain && this.audioContext) {
           t.volumeGain.gain.setValueAtTime(value, this.audioContext.currentTime);
+        }
+        // noCorsMode トラックは audio.volume で直接制御
+        this._updateNoCorsVolume();
+      }
+      _updateNoCorsVolume() {
+        const { gainA, gainB } = calculateCrossfadeGains(this._crossfadeValue);
+        if (this.trackA.noCorsMode && this.trackA.audioElement) {
+          this.trackA.audioElement.volume = Math.max(0, Math.min(1, (this._volumeA || 1) * gainA));
+        }
+        if (this.trackB.noCorsMode && this.trackB.audioElement) {
+          this.trackB.audioElement.volume = Math.max(0, Math.min(1, (this._volumeB || 1) * gainB));
         }
       }
       getCurrentTime() {
@@ -1579,11 +1692,12 @@
         this._stopSources();
         for (const t of [this.trackA, this.trackB]) {
           if (t.mediaSource) { t.mediaSource.disconnect(); t.mediaSource = null; }
-          if (t.audioElement) { t.audioElement.pause(); t.audioElement.removeAttribute('src'); t.audioElement.load(); t.audioElement = null; }
+          if (t.audioElement) { t.audioElement.pause(); t.audioElement.removeAttribute('src'); t.audioElement.load(); if (t.audioElement.parentNode) t.audioElement.parentNode.removeChild(t.audioElement); t.audioElement = null; }
           if (t.volumeGain) { t.volumeGain.disconnect(); t.volumeGain = null; }
           if (t.crossfadeGain) { t.crossfadeGain.disconnect(); t.crossfadeGain = null; }
           t.buffer = null;
           t.useMediaElement = false;
+          t.noCorsMode = false;
         }
         if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
         this._playbackState = { isPlaying: false, startedAt: 0, offset: 0 };
