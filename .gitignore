@@ -1,6 +1,14 @@
 # Dependencies
 node_modules/
 
+# Development files
+src/
+tests/
+package.json
+package-lock.json
+vitest.config.js
+README-dev.md
+
 # Vitest
 coverage/
 
