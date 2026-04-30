@@ -1090,16 +1090,6 @@
     const URLConverter = {
       convert(url) {
         const originalUrl = url;
-        if (this.isGoogleDriveUrl(url)) {
-          const fileId = this.extractGoogleDriveFileId(url);
-          if (fileId) {
-            return {
-              converted: 'https://drive.usercontent.google.com/download?id=' + fileId + '&export=download',
-              isConverted: true,
-              originalUrl,
-            };
-          }
-        }
         if (this.isDropboxUrl(url)) {
           const converted = this._convertDropboxUrl(url);
           return {
@@ -1110,27 +1100,13 @@
         }
         return { converted: url, isConverted: false, originalUrl };
       },
-      isGoogleDriveUrl(url) {
-        return /^https?:\/\/drive\.google\.com\//i.test(url);
-      },
       isDropboxUrl(url) {
         return /^https?:\/\/(www\.)?dropbox\.com\//i.test(url);
-      },
-      extractGoogleDriveFileId(url) {
-        const filePattern = /\/file\/d\/([a-zA-Z0-9_-]+)/;
-        const fileMatch = url.match(filePattern);
-        if (fileMatch) return fileMatch[1];
-        const openPattern = /[?&]id=([a-zA-Z0-9_-]+)/;
-        const openMatch = url.match(openPattern);
-        if (openMatch) return openMatch[1];
-        return null;
       },
       _convertDropboxUrl(url) {
         try {
           const urlObj = new URL(url);
-          // www.dropbox.com を dl.dropboxusercontent.com に置換（CORS対応）
           urlObj.hostname = 'dl.dropboxusercontent.com';
-          // dl パラメータは dropboxusercontent.com では不要なので削除
           urlObj.searchParams.delete('dl');
           return urlObj.toString();
         } catch {
@@ -1391,20 +1367,6 @@
           await this.initialize();
         }
 
-        const isFileProtocol = window.location.protocol === 'file:';
-
-        // file:// プロトコルの場合、fetch() は使えないので <audio> 要素で直接読み込む
-        if (isFileProtocol) {
-          try {
-            return await this._tryLoadAudioElement(track, url, false);
-          } catch (err) {
-            if (originalUrl && originalUrl !== url) {
-              throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: err });
-            }
-            throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: err.message || '読み込みに失敗しました', cause: err });
-          }
-        }
-
         let fetchError = null;
         let isCorsError = false;
         let response;
@@ -1439,19 +1401,13 @@
         }
         const t = track === 'A' ? this.trackA : this.trackB;
         if (isCorsError) {
-          // Strategy 1: <audio> element fallback (with and without CORS)
           try {
             return await this._loadTrackViaAudioElement(track, url);
           } catch (audioElErr) {
-            // Strategy 2: CORS proxy fallback
-            try {
-              return await this._loadTrackViaCorsProxy(track, url);
-            } catch (proxyErr) {
-              if (originalUrl && originalUrl !== url) {
-                throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: fetchError || proxyErr });
-              }
-              throw createLoadError(AudioErrorType.CORS_ERROR, { cause: fetchError || proxyErr });
+            if (originalUrl && originalUrl !== url) {
+              throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: fetchError || audioElErr });
             }
+            throw createLoadError(AudioErrorType.CORS_ERROR, { cause: fetchError || audioElErr });
           }
         }
         let audioBuffer;
@@ -1552,35 +1508,6 @@
           audio.src = url;
           audio.load();
         });
-      }
-      async _loadTrackViaCorsProxy(track, url) {
-        // CORSプロキシ経由でfetchし、AudioBufferとしてデコード
-        const CORS_PROXIES = [
-          (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-          (u) => 'https://corsproxy.io/?' + encodeURIComponent(u),
-        ];
-        let lastErr = null;
-        for (const makeProxyUrl of CORS_PROXIES) {
-          const proxyUrl = makeProxyUrl(url);
-          try {
-            const response = await fetch(proxyUrl);
-            if (!response.ok) { lastErr = new Error('Proxy HTTP ' + response.status); continue; }
-            const arrayBuffer = await response.arrayBuffer();
-            if (arrayBuffer.byteLength < 100) { lastErr = new Error('Proxy returned empty response'); continue; }
-            const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-            const t = track === 'A' ? this.trackA : this.trackB;
-            t.buffer = audioBuffer;
-            t.useMediaElement = false;
-            t.noCorsMode = false;
-            this._ensureGainNodes(track);
-            let name;
-            try { const urlObj = new URL(url); name = urlObj.pathname.split('/').pop() || url; } catch { name = url; }
-            return { name, duration: audioBuffer.duration, sampleRate: audioBuffer.sampleRate, numberOfChannels: audioBuffer.numberOfChannels };
-          } catch (err) {
-            lastErr = err;
-          }
-        }
-        throw lastErr || new Error('All CORS proxies failed for: ' + url);
       }
       play(offset) {
         if (offset === undefined) offset = 0;
