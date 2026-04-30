@@ -372,6 +372,31 @@
       display: none;
     }
 
+    /* ===== Track Warning ===== */
+    .track-warning {
+      padding: 8px 12px;
+      background: rgba(255, 180, 0, 0.1);
+      border: 1px solid rgba(255, 180, 0, 0.3);
+      border-radius: var(--radius-sm);
+      color: #ffb400;
+      font-size: 0.78rem;
+      line-height: 1.4;
+    }
+
+    .track-warning[hidden] {
+      display: none;
+    }
+
+    .pan-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .waveform-canvas.disabled {
+      pointer-events: none;
+      opacity: 0.4;
+    }
+
     /* ===== Track Info ===== */
     .track-info {
       display: flex;
@@ -1057,6 +1082,8 @@
         <span class="track-duration"></span>
       </div>
 
+      <div id="warning-a" class="track-warning" hidden>⚠ 互換モードで動作中: 波形表示とパン操作(L/ST/R)は利用できません</div>
+
       <canvas id="waveform-a" class="waveform-canvas" width="300" height="100" aria-label="Track Aの波形表示"></canvas>
 
       <div class="volume-control">
@@ -1190,6 +1217,8 @@
         <span class="track-name"></span>
         <span class="track-duration"></span>
       </div>
+
+      <div id="warning-b" class="track-warning" hidden>⚠ 互換モードで動作中: 波形表示とパン操作(L/ST/R)は利用できません</div>
 
       <canvas id="waveform-b" class="waveform-canvas" width="300" height="100" aria-label="Track Bの波形表示"></canvas>
 
@@ -2058,12 +2087,14 @@
 
         // Update source status
         updateSourceStatus(track);
+        updateMediaElementWarning(track);
       } catch (err) {
         trackState.loadingState = 'error';
         trackState.error = err.userMessage || err.message;
         UI.setLoading(track, false);
         UI.showError(track, trackState.error);
         updateSourceStatus(track);
+        updateMediaElementWarning(track);
       }
     }
 
@@ -2148,12 +2179,14 @@
 
         // Update source status
         updateSourceStatus(track);
+        updateMediaElementWarning(track);
       } catch (err) {
         trackState.loadingState = 'error';
         trackState.error = err.userMessage || err.message;
         UI.setLoading(track, false);
         UI.showError(track, trackState.error);
         updateSourceStatus(track);
+        updateMediaElementWarning(track);
       }
     }
 
@@ -2179,6 +2212,24 @@
         statusText.className = 'source-status-text loaded-local';
       }
       clearBtn.hidden = false;
+    }
+
+    function updateMediaElementWarning(track) {
+      const t = track === 'A' ? audioEngine.trackA : audioEngine.trackB;
+      const warningEl = document.getElementById('warning-' + track.toLowerCase());
+      const canvas = track === 'A' ? UI.els.waveformA : UI.els.waveformB;
+      const panBtns = document.querySelectorAll('.pan-btn[data-track="' + track + '"]');
+      const isMediaElement = t.useMediaElement;
+
+      if (isMediaElement) {
+        warningEl.hidden = false;
+        canvas.classList.add('disabled');
+        panBtns.forEach(btn => { btn.disabled = true; });
+      } else {
+        warningEl.hidden = true;
+        canvas.classList.remove('disabled');
+        panBtns.forEach(btn => { btn.disabled = false; });
+      }
     }
 
     function handleClearTrack(track) {
@@ -2228,6 +2279,7 @@
 
       // Update source status
       updateSourceStatus(track);
+      updateMediaElementWarning(track);
     }
 
     function handleTogglePlay() {
@@ -2307,6 +2359,10 @@
     }
 
     function handleWaveformClick(track, event) {
+      // MediaElement モードでは波形クリックシークを無効化
+      const t = track === 'A' ? audioEngine.trackA : audioEngine.trackB;
+      if (t.useMediaElement) return;
+
       const canvas = track === 'A' ? UI.els.waveformA : UI.els.waveformB;
       const renderer = track === 'A' ? waveformRendererA : waveformRendererB;
       const position = renderer.getPositionFromClick(canvas, event.clientX);
