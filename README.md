@@ -1,6 +1,8 @@
-# 🎵 WebCrossFader
+# 🎵 CrossfadePlayer
 
 ブラウザ上で動作する音声クロスフェーダーアプリケーション。2つの音源をURLから読み込み、同時再生しながらクロスフェーダーでリアルタイムに音量バランスを制御できます。
+
+**▶ [アプリを開く](https://kagoiri.github.io/CrossfadePlayer/)**
 
 ## 特徴
 
@@ -38,7 +40,7 @@ Google Drive や Dropbox の共有リンクをそのまま URL 入力欄に貼�
 
 ### URL共有
 
-「🔗 共有用URLをコピー」ボタンをクリックすると、現在読み込んでいる音源の組み合わせを含むURLがクリップボードにコピーされます。このURLを他の人に送ると、同じ音源の組み合わせでWebCrossFaderを開けます。
+「🔗 共有用URLをコピー」ボタンをクリックすると、現在読み込んでいる音源の組み合わせを含むURLがクリップボードにコピーされます。このURLを他の人に送ると、同じ音源の組み合わせでCrossfadePlayerを開けます。
 
 ### キーボードショートカット
 
@@ -56,7 +58,7 @@ Google Drive や Dropbox の共有リンクをそのまま URL 入力欄に貼�
 
 1. このリポジトリの Settings → Pages を開く
 2. Source を `main` ブランチ、`/ (root)` に設定
-3. `https://<ユーザー名>.github.io/WebCrossFader/` で公開
+3. `https://<ユーザー名>.github.io/CrossfadePlayer/` で公開
 
 ### その他のホスティング
 
@@ -83,7 +85,7 @@ Vitest + fast-check によるユニットテスト・プロパティベーステ
 ### プロジェクト構成
 
 ```
-WebCrossFader/
+CrossfadePlayer/
 ├── index.html              # アプリケーション本体（HTML/CSS/JS統合）
 ├── src/                    # テスト用モジュール（個別ファイル）
 │   ├── audio-engine.js     # Web Audio API 音声再生・制御

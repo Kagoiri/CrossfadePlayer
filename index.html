@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebCrossFader</title>
+  <title>CrossfadePlayer</title>
   <style>
     /* ===== CSS Custom Properties ===== */
     :root {
@@ -80,6 +80,23 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
+    }
+
+    .readme-link {
+      display: inline-block;
+      margin-top: 6px;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-decoration: none;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      transition: color var(--transition-fast), border-color var(--transition-fast);
+    }
+
+    .readme-link:hover {
+      color: var(--color-text);
+      border-color: var(--color-text-muted);
     }
 
     /* ===== App Container: 3-Column Grid ===== */
@@ -858,7 +875,8 @@
 </head>
 <body>
   <header>
-    <h1>WebCrossFader</h1>
+    <h1>CrossfadePlayer</h1>
+    <a id="readme-link" class="readme-link" href="https://github.com/" target="_blank" rel="noopener noreferrer" aria-label="使い方・ドキュメントを開く">📖 使い方</a>
   </header>
 
   <main class="app-container">
@@ -1973,6 +1991,18 @@
       // Initialize UI module
       UI.initialize();
 
+      // --- Set README link URL ---
+      // Auto-detect GitHub repo URL from github.io hosting, otherwise use a placeholder
+      const readmeLink = document.getElementById('readme-link');
+      if (readmeLink) {
+        const host = window.location.hostname;
+        if (host.endsWith('.github.io')) {
+          const user = host.replace('.github.io', '');
+          const repo = window.location.pathname.split('/')[1] || '';
+          readmeLink.href = 'https://github.com/' + user + '/' + repo + '#readme';
+        }
+      }
+
       // --- Event Listeners (Task 13.2) ---
 
       // Load buttons
@@ -2090,7 +2120,7 @@
 
         autoLoadOverlay.innerHTML =
           '<div style="text-align:center;color:#e0e0f0;max-width:600px;">' +
-            '<p style="font-size:1.3rem;margin-bottom:8px;">🎵 WebCrossFader</p>' +
+            '<p style="font-size:1.3rem;margin-bottom:8px;">🎵 CrossfadePlayer</p>' +
             '<p style="font-size:0.95rem;color:#8888aa;margin-bottom:16px;">クロスフェード再生用の音源として、ネットワーク上のファイルを読み込みます。</p>' +
             '<div style="background:rgba(26,26,53,0.8);border:1px solid #2a2a4a;border-radius:8px;padding:12px 16px;margin-bottom:20px;text-align:left;">' +
               urlListHtml +
