@@ -689,6 +689,105 @@
       white-space: nowrap;
     }
 
+    /* ===== Settings Section ===== */
+    .settings-section {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 8px 16px;
+      text-align: center;
+    }
+
+    .settings-toggle {
+      padding: 8px 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 0.78rem;
+      cursor: pointer;
+      list-style: none;
+      display: inline-block;
+      min-height: 44px;
+      line-height: 28px;
+    }
+
+    .settings-toggle:hover {
+      color: var(--color-text);
+      border-color: var(--color-text-muted);
+    }
+
+    .settings-toggle::-webkit-details-marker { display: none; }
+
+    .settings-content {
+      margin: 12px auto 0;
+      padding: 16px;
+      background: var(--color-bg-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      max-width: 500px;
+      text-align: left;
+    }
+
+    .settings-label {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--color-text);
+      margin-bottom: 4px;
+    }
+
+    .settings-description {
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      margin: 0 0 10px;
+    }
+
+    .settings-description a {
+      color: var(--color-accent);
+      text-decoration: none;
+    }
+
+    .settings-description a:hover {
+      text-decoration: underline;
+    }
+
+    .settings-input-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .settings-input {
+      flex: 1;
+      padding: 8px 10px;
+      background: var(--color-bg-input);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-text);
+      font-size: 0.82rem;
+      outline: none;
+      min-height: 40px;
+    }
+
+    .settings-input:focus {
+      border-color: var(--color-accent);
+    }
+
+    .settings-save-btn {
+      padding: 8px 16px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-input);
+      color: var(--color-text);
+      font-size: 0.82rem;
+      cursor: pointer;
+      min-height: 40px;
+      white-space: nowrap;
+    }
+
+    .settings-save-btn:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
     /* ===== Keyboard Shortcuts Help ===== */
     .shortcuts-help {
       max-width: 1400px;
@@ -1043,6 +1142,21 @@
       </div>
     </section>
   </main>
+
+  <!-- Settings -->
+  <aside class="settings-section" aria-label="設定">
+    <details class="settings-details">
+      <summary class="settings-toggle">⚙ 設定</summary>
+      <div class="settings-content">
+        <label for="cors-proxy-url" class="settings-label">CORSプロキシURL（Google Drive用）</label>
+        <p class="settings-description">Google Driveの音源を読み込むにはCORSプロキシが必要です。<a href="https://github.com/" target="_blank" rel="noopener">セットアップ方法</a></p>
+        <div class="settings-input-row">
+          <input type="text" id="cors-proxy-url" class="settings-input" placeholder="https://your-proxy.workers.dev/" aria-label="CORSプロキシURL" />
+          <button id="save-proxy-btn" class="settings-save-btn">保存</button>
+        </div>
+      </div>
+    </details>
+  </aside>
 
   <!-- Keyboard Shortcuts Help -->
   <aside id="shortcuts-help" class="shortcuts-help" aria-label="キーボードショートカット">
@@ -1403,20 +1517,53 @@
             }
             throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: err.message || '読み込みに失敗しました', cause: err });
           }
+
+        // Google Drive の場合、直接 fetch は CORS/リダイレクトで失敗するため
+        // Google Drive: CORSプロキシ経由で取得（プロキシ必須）
+        } else if (/drive\.(google\.com|usercontent\.google\.com)/i.test(url)) {
+          console.log('[CrossfadePlayer] Google Drive detected');
+          const proxyUrl = this._getCorsProxyUrl();
+          if (!proxyUrl) {
+            throw createLoadError(AudioErrorType.NETWORK_ERROR, {
+              detail: 'Google Driveの音源を読み込むにはCORSプロキシの設定が必要です。画面下部の「⚙ 設定」からプロキシURLを設定してください。'
+            });
+          }
+          try {
+            const proxied = proxyUrl.replace(/\/+$/, '') + '/?url=' + encodeURIComponent(url);
+            console.log('[CrossfadePlayer] Fetching via proxy:', proxied);
+            const resp = await fetch(proxied);
+            if (!resp.ok) throw new Error('Proxy HTTP ' + resp.status);
+            const ab = await resp.arrayBuffer();
+            if (ab.byteLength < 100) throw new Error('Empty response from proxy');
+            const audioBuffer = await this.audioContext.decodeAudioData(ab);
+            const t = track === 'A' ? this.trackA : this.trackB;
+            t.buffer = audioBuffer; t.useMediaElement = false; t.noCorsMode = false;
+            this._ensureGainNodes(track);
+            let name; try { name = new URL(url).pathname.split('/').pop() || url; } catch { name = url; }
+            return { name, duration: audioBuffer.duration, sampleRate: audioBuffer.sampleRate, numberOfChannels: audioBuffer.numberOfChannels };
+          } catch (e) {
+            console.log('[CrossfadePlayer] Proxy fetch failed:', e.message);
+            if (originalUrl && originalUrl !== url) {
+              throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: e });
+            }
+            throw createLoadError(AudioErrorType.NETWORK_ERROR, { detail: 'CORSプロキシ経由の取得に失敗しました: ' + e.message, cause: e });
+          }
         }
 
         let fetchError = null;
         let isCorsError = false;
         let response;
         try {
+          console.log('[CrossfadePlayer] Attempting fetch:', url);
           response = await fetch(url);
+          console.log('[CrossfadePlayer] fetch response:', { ok: response.ok, status: response.status, type: response.type });
         } catch (err) {
-          if (err instanceof TypeError && err.message) {
-            const msg = err.message.toLowerCase();
-            if (msg.includes('cors') || msg.includes('blocked') || msg.includes('opaque') || msg.includes('failed to fetch')) {
-              isCorsError = true;
-              fetchError = err;
-            }
+          console.log('[CrossfadePlayer] fetch threw:', err.constructor.name, err.message);
+          // TypeError は一般的に CORS またはネットワークエラーを示す
+          // ブラウザによってメッセージが異なるため、TypeError であれば常にフォールバックを試行
+          if (err instanceof TypeError) {
+            isCorsError = true;
+            fetchError = err;
           }
           if (!isCorsError) {
             if (originalUrl && originalUrl !== url) {
@@ -1439,14 +1586,23 @@
         }
         const t = track === 'A' ? this.trackA : this.trackB;
         if (isCorsError) {
+          console.log('[CrossfadePlayer] fetch failed with CORS error, trying fallbacks...', fetchError?.message);
           // Strategy 1: <audio> element fallback (with and without CORS)
           try {
-            return await this._loadTrackViaAudioElement(track, url);
+            console.log('[CrossfadePlayer] Strategy 1: trying <audio> element...');
+            const result = await this._loadTrackViaAudioElement(track, url);
+            console.log('[CrossfadePlayer] Strategy 1 succeeded');
+            return result;
           } catch (audioElErr) {
+            console.log('[CrossfadePlayer] Strategy 1 failed:', audioElErr.message);
             // Strategy 2: CORS proxy fallback
             try {
-              return await this._loadTrackViaCorsProxy(track, url);
+              console.log('[CrossfadePlayer] Strategy 2: trying CORS proxy...');
+              const result = await this._loadTrackViaCorsProxy(track, url);
+              console.log('[CrossfadePlayer] Strategy 2 succeeded');
+              return result;
             } catch (proxyErr) {
+              console.log('[CrossfadePlayer] Strategy 2 failed:', proxyErr.message);
               if (originalUrl && originalUrl !== url) {
                 throw createLoadError(AudioErrorType.CONVERTED_URL_ERROR, { originalUrl, convertedUrl: url, cause: fetchError || proxyErr });
               }
@@ -1552,6 +1708,14 @@
           audio.src = url;
           audio.load();
         });
+      }
+      _getCorsProxyUrl() {
+        // localStorage から保存済みのプロキシURLを取得
+        try {
+          return localStorage.getItem('crossfade-player-cors-proxy') || '';
+        } catch {
+          return '';
+        }
       }
       async _loadTrackViaCorsProxy(track, url) {
         // CORSプロキシ経由でfetchし、AudioBufferとしてデコード
@@ -1942,6 +2106,13 @@
           AppState.trackB.loadingState === 'loaded' ? AppState.trackB.url : null
         );
       } catch (err) {
+        console.error('[CrossfadePlayer] loadTrack failed:', {
+          type: err.type,
+          message: err.message,
+          userMessage: err.userMessage,
+          cause: err.cause,
+          stack: err.stack,
+        });
         trackState.loadingState = 'error';
         trackState.error = err.userMessage || err.message;
         UI.setLoading(track, false);
@@ -2181,6 +2352,24 @@
         const isHidden = list.hidden;
         list.hidden = !isHidden;
         UI.els.shortcutsToggle.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+      });
+
+      // --- CORS Proxy Settings ---
+      const corsProxyInput = document.getElementById('cors-proxy-url');
+      const saveProxyBtn = document.getElementById('save-proxy-btn');
+      // Load saved proxy URL
+      try {
+        const saved = localStorage.getItem('crossfade-player-cors-proxy');
+        if (saved) corsProxyInput.value = saved;
+      } catch {}
+      saveProxyBtn.addEventListener('click', () => {
+        const val = corsProxyInput.value.trim();
+        try {
+          localStorage.setItem('crossfade-player-cors-proxy', val);
+        } catch {}
+        const origText = saveProxyBtn.textContent;
+        saveProxyBtn.textContent = '✅ 保存しました';
+        setTimeout(() => { saveProxyBtn.textContent = origText; }, 1500);
       });
 
       // --- Register Keyboard Handler (Task 14.1) ---

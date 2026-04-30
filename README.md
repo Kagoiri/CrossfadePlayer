@@ -35,8 +35,20 @@ WAV / MP3 / FLAC / OGG
 
 Google Drive や Dropbox の共有リンクをそのまま URL 入力欄に貼り付けてください。自動的に直接ダウンロード用のURLに変換されます。
 
-- **Google Drive**: 「リンクを知っている全員」に共有設定してください
-- **Dropbox**: 共有リンクをそのままコピーしてください
+- **Dropbox**: 共有リンクをそのままコピーしてください（追加設定不要）
+- **Google Drive**: CORSプロキシの設定が必要です（下記参照）
+
+### Google Drive 用 CORSプロキシの設定
+
+Google Drive はブラウザからの直接ダウンロードをセキュリティポリシーでブロックするため、CORSプロキシが必要です。Cloudflare Workers（無料）で簡単にセットアップできます。
+
+1. [Cloudflare Workers](https://workers.cloudflare.com/) でアカウント作成
+2. Workers & Pages → Create → Create Worker
+3. リポジトリ内の `cors-proxy-worker.js` のコードを貼り付けて Deploy
+4. 発行されたURL（例: `https://my-proxy.username.workers.dev`）をコピー
+5. CrossfadePlayer の画面下部「⚙ 設定」→「CORSプロキシURL」に貼り付けて保存
+
+設定は localStorage に保存されるため、次回以降は自動的に使用されます。
 
 ### URL共有
 
