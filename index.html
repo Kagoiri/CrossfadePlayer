@@ -120,6 +120,8 @@
       display: flex;
       flex-direction: column;
       gap: 14px;
+      overflow: hidden;
+      min-width: 0;
     }
 
     #track-a {
@@ -154,6 +156,7 @@
 
     .url-input {
       flex: 1;
+      min-width: 0;
       padding: 10px 12px;
       background: var(--color-bg-input);
       border: 1px solid var(--color-border);
@@ -212,6 +215,107 @@
 
     .load-btn:active {
       transform: scale(0.97);
+    }
+
+    /* ===== Source Status ===== */
+    .track-source-status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: var(--color-bg-input);
+      border-radius: var(--radius-sm);
+      min-height: 32px;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .source-status-text {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .source-status-text.loaded-local {
+      color: var(--color-accent);
+    }
+
+    .source-status-text.loaded-network {
+      color: var(--color-success);
+    }
+
+    .source-clear-btn {
+      padding: 2px 8px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: color var(--transition-fast), border-color var(--transition-fast);
+      min-width: 28px;
+      min-height: 28px;
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+
+    .source-clear-btn:hover {
+      color: var(--color-error);
+      border-color: var(--color-error);
+    }
+
+    .source-clear-btn[hidden] {
+      display: none;
+    }
+
+    /* ===== Load Section Labels ===== */
+    .track-load-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .load-section-label {
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+      letter-spacing: 0.04em;
+    }
+
+    /* ===== File Select Button ===== */
+    .track-file-controls {
+      display: flex;
+    }
+
+    .file-select-btn {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px dashed var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-text-muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+      min-height: 40px;
+    }
+
+    .file-select-btn:hover {
+      background: var(--color-bg-hover);
+      border-color: var(--color-accent);
+      color: var(--color-text);
+    }
+
+    .file-input-hidden {
+      display: none;
+    }
+
+    /* Drop zone highlight on track panel */
+    .track-panel.drop-active {
+      border-color: var(--color-accent) !important;
+      box-shadow: inset 0 0 20px rgba(124, 92, 255, 0.1);
     }
 
     /* ===== Loading Indicator ===== */
@@ -700,7 +804,6 @@
       transition: background var(--transition-fast), color var(--transition-fast),
                   border-color var(--transition-fast);
       min-height: 44px;
-      white-space: nowrap;
     }
 
     .share-btn:hover {
@@ -719,7 +822,6 @@
       color: var(--color-text-muted);
       text-align: center;
       line-height: 1.4;
-      white-space: nowrap;
     }
 
     /* ===== Keyboard Shortcuts Help ===== */
@@ -917,16 +1019,30 @@
     <section id="track-a" class="track-panel" aria-label="Track A">
       <h2 class="track-title">Track A</h2>
 
-      <div class="track-url-controls">
-        <label for="url-a" class="visually-hidden">Track A URL</label>
-        <input
-          type="text"
-          id="url-a"
-          class="url-input"
-          placeholder="音源URLを入力..."
-          aria-label="Track AのURL入力"
-        />
-        <button id="load-a" class="load-btn" aria-label="Track Aの音源を読み込む">読み込み</button>
+      <div class="track-source-status" id="source-status-a">
+        <span class="source-status-text">音源が読み込まれていません</span>
+        <button class="source-clear-btn" id="clear-a" hidden aria-label="Track Aの音源をクリア">✕</button>
+      </div>
+      <div class="track-load-section">
+        <span class="load-section-label">🌐 ネットワーク</span>
+        <div class="track-url-controls">
+          <label for="url-a" class="visually-hidden">Track A URL</label>
+          <input
+            type="text"
+            id="url-a"
+            class="url-input"
+            placeholder="音源URLを入力..."
+            aria-label="Track AのURL入力"
+          />
+          <button id="load-a" class="load-btn" aria-label="URLから読み込む">読込</button>
+        </div>
+      </div>
+      <div class="track-load-section">
+        <span class="load-section-label">📁 ローカル</span>
+        <div class="track-file-controls">
+          <button id="file-a" class="file-select-btn" aria-label="ローカルファイルを選択またはドロップ">ファイルを選択 / ドロップ</button>
+          <input type="file" id="file-input-a" class="file-input-hidden" accept="audio/*,.wav,.mp3,.flac,.ogg" />
+        </div>
       </div>
 
       <div id="loading-a" class="loading-indicator" hidden aria-live="polite">
@@ -1037,16 +1153,30 @@
     <section id="track-b" class="track-panel" aria-label="Track B">
       <h2 class="track-title">Track B</h2>
 
-      <div class="track-url-controls">
-        <label for="url-b" class="visually-hidden">Track B URL</label>
-        <input
-          type="text"
-          id="url-b"
-          class="url-input"
-          placeholder="音源URLを入力..."
-          aria-label="Track BのURL入力"
-        />
-        <button id="load-b" class="load-btn" aria-label="Track Bの音源を読み込む">読み込み</button>
+      <div class="track-source-status" id="source-status-b">
+        <span class="source-status-text">音源が読み込まれていません</span>
+        <button class="source-clear-btn" id="clear-b" hidden aria-label="Track Bの音源をクリア">✕</button>
+      </div>
+      <div class="track-load-section">
+        <span class="load-section-label">🌐 ネットワーク</span>
+        <div class="track-url-controls">
+          <label for="url-b" class="visually-hidden">Track B URL</label>
+          <input
+            type="text"
+            id="url-b"
+            class="url-input"
+            placeholder="音源URLを入力..."
+            aria-label="Track BのURL入力"
+          />
+          <button id="load-b" class="load-btn" aria-label="URLから読み込む">読込</button>
+        </div>
+      </div>
+      <div class="track-load-section">
+        <span class="load-section-label">📁 ローカル</span>
+        <div class="track-file-controls">
+          <button id="file-b" class="file-select-btn" aria-label="ローカルファイルを選択またはドロップ">ファイルを選択 / ドロップ</button>
+          <input type="file" id="file-input-b" class="file-input-hidden" accept="audio/*,.wav,.mp3,.flac,.ogg" />
+        </div>
       </div>
 
       <div id="loading-b" class="loading-indicator" hidden aria-live="polite">
@@ -1870,6 +2000,73 @@
     // Event Handlers (Task 13.2)
     // ============================================================
 
+    async function handleLoadFile(track, file) {
+      // Ensure AudioContext is initialized on user interaction
+      try {
+        await audioEngine.initialize();
+      } catch (err) {
+        UI.showError(track, err.userMessage || err.message);
+        return;
+      }
+
+      const trackState = track === 'A' ? AppState.trackA : AppState.trackB;
+      UI.showError(track, null);
+
+      // ObjectURL を生成
+      const objectUrl = URL.createObjectURL(file);
+      const urlInput = track === 'A' ? UI.els.urlA : UI.els.urlB;
+      urlInput.value = '';
+      trackState.url = '';  // ローカルファイルは共有URLに含めない
+      trackState.convertedUrl = null;
+      trackState.loadingState = 'loading';
+      UI.setLoading(track, true);
+
+      try {
+        const info = await audioEngine.loadTrack(track, objectUrl);
+        info.name = file.name;  // ObjectURLではなくファイル名を使用
+        trackState.info = info;
+        trackState.loadingState = 'loaded';
+        UI.setLoading(track, false);
+        UI.updateTrackInfo(track, info);
+
+        const canvas = track === 'A' ? UI.els.waveformA : UI.els.waveformB;
+        UI._resizeCanvas(canvas);
+        const buffer = track === 'A' ? audioEngine.trackA.buffer : audioEngine.trackB.buffer;
+        const renderer = track === 'A' ? waveformRendererA : waveformRendererB;
+        if (buffer) { renderer.draw(canvas, buffer); }
+
+        const bothLoaded = isPlayEnabled(
+          AppState.trackA.loadingState === 'loaded',
+          AppState.trackB.loadingState === 'loaded'
+        );
+        UI.setTransportEnabled(bothLoaded);
+
+        if (AppState.playback.isPlaying) {
+          audioEngine.stop();
+          AppState.playback.isPlaying = false;
+          UI.updatePlayState(false);
+          stopAnimationLoop();
+        }
+        AppState.playback.currentTime = 0;
+        audioEngine._playbackState.offset = 0;
+
+        if (bothLoaded) {
+          const duration = audioEngine.getDuration();
+          AppState.playback.duration = duration;
+          UI.updateProgress(0, duration);
+        }
+
+        // Update source status
+        updateSourceStatus(track);
+      } catch (err) {
+        trackState.loadingState = 'error';
+        trackState.error = err.userMessage || err.message;
+        UI.setLoading(track, false);
+        UI.showError(track, trackState.error);
+        updateSourceStatus(track);
+      }
+    }
+
     async function handleLoadTrack(track) {
       // Ensure AudioContext is initialized on user interaction
       try {
@@ -1948,12 +2145,89 @@
           AppState.trackA.loadingState === 'loaded' ? AppState.trackA.url : null,
           AppState.trackB.loadingState === 'loaded' ? AppState.trackB.url : null
         );
+
+        // Update source status
+        updateSourceStatus(track);
       } catch (err) {
         trackState.loadingState = 'error';
         trackState.error = err.userMessage || err.message;
         UI.setLoading(track, false);
         UI.showError(track, trackState.error);
+        updateSourceStatus(track);
       }
+    }
+
+    function updateSourceStatus(track) {
+      const trackState = track === 'A' ? AppState.trackA : AppState.trackB;
+      const statusText = document.querySelector('#source-status-' + track.toLowerCase() + ' .source-status-text');
+      const clearBtn = document.getElementById('clear-' + track.toLowerCase());
+
+      if (trackState.loadingState !== 'loaded' || !trackState.info) {
+        statusText.textContent = '音源が読み込まれていません';
+        statusText.className = 'source-status-text';
+        clearBtn.hidden = true;
+        return;
+      }
+
+      if (trackState.url) {
+        // Network file
+        statusText.textContent = '🌐 ' + trackState.url;
+        statusText.className = 'source-status-text loaded-network';
+      } else {
+        // Local file
+        statusText.textContent = '📁 ' + trackState.info.name;
+        statusText.className = 'source-status-text loaded-local';
+      }
+      clearBtn.hidden = false;
+    }
+
+    function handleClearTrack(track) {
+      const trackState = track === 'A' ? AppState.trackA : AppState.trackB;
+
+      // Stop playback if playing
+      if (AppState.playback.isPlaying) {
+        audioEngine.stop();
+        AppState.playback.isPlaying = false;
+        UI.updatePlayState(false);
+        stopAnimationLoop();
+      }
+
+      // Clear track state
+      trackState.url = '';
+      trackState.convertedUrl = null;
+      trackState.info = null;
+      trackState.loadingState = 'idle';
+      trackState.error = null;
+
+      // Clear audio engine track
+      const t = track === 'A' ? audioEngine.trackA : audioEngine.trackB;
+      if (t.source) { try { t.source.stop(); } catch {} t.source.disconnect(); t.source = null; }
+      if (t.mediaSource) { t.mediaSource.disconnect(); t.mediaSource = null; }
+      if (t.audioElement) { t.audioElement.pause(); t.audioElement.removeAttribute('src'); t.audioElement.load(); if (t.audioElement.parentNode) t.audioElement.parentNode.removeChild(t.audioElement); t.audioElement = null; }
+      t.buffer = null;
+      t.useMediaElement = false;
+      t.noCorsMode = false;
+
+      // Clear UI
+      const urlInput = track === 'A' ? UI.els.urlA : UI.els.urlB;
+      urlInput.value = '';
+      UI.updateTrackInfo(track, null);
+      UI.showError(track, null);
+      UI.setTransportEnabled(false);
+
+      // Clear waveform
+      const canvas = track === 'A' ? UI.els.waveformA : UI.els.waveformB;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#1a1a35';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Reset playback position
+      AppState.playback.currentTime = 0;
+      audioEngine._playbackState.offset = 0;
+      UI.updateProgress(0, 0);
+
+      // Update source status
+      updateSourceStatus(track);
     }
 
     function handleTogglePlay() {
@@ -2130,6 +2404,44 @@
       UI.els.loadA.addEventListener('click', () => handleLoadTrack('A'));
       UI.els.loadB.addEventListener('click', () => handleLoadTrack('B'));
 
+      // File buttons
+      const fileInputA = document.getElementById('file-input-a');
+      const fileInputB = document.getElementById('file-input-b');
+      document.getElementById('file-a').addEventListener('click', () => fileInputA.click());
+      document.getElementById('file-b').addEventListener('click', () => fileInputB.click());
+      fileInputA.addEventListener('change', (e) => {
+        if (e.target.files[0]) handleLoadFile('A', e.target.files[0]);
+        e.target.value = '';  // 同じファイルを再選択可能にする
+      });
+      fileInputB.addEventListener('change', (e) => {
+        if (e.target.files[0]) handleLoadFile('B', e.target.files[0]);
+        e.target.value = '';
+      });
+
+      // Clear buttons
+      document.getElementById('clear-a').addEventListener('click', () => handleClearTrack('A'));
+      document.getElementById('clear-b').addEventListener('click', () => handleClearTrack('B'));
+
+      // Drag & drop on track panels
+      [['A', document.getElementById('track-a')], ['B', document.getElementById('track-b')]].forEach(([track, panel]) => {
+        panel.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          panel.classList.add('drop-active');
+        });
+        panel.addEventListener('dragleave', (e) => {
+          // Only remove if leaving the panel (not entering a child)
+          if (!panel.contains(e.relatedTarget)) {
+            panel.classList.remove('drop-active');
+          }
+        });
+        panel.addEventListener('drop', (e) => {
+          e.preventDefault();
+          panel.classList.remove('drop-active');
+          const file = e.dataTransfer.files[0];
+          if (file) handleLoadFile(track, file);
+        });
+      });
+
       // Allow Enter key in URL inputs to trigger load
       UI.els.urlA.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') handleLoadTrack('A');
@@ -2245,12 +2557,42 @@
         autoLoadOverlay.id = 'auto-load-overlay';
         autoLoadOverlay.style.cssText = 'position:fixed;inset:0;background:rgba(13,13,26,0.92);display:flex;align-items:center;justify-content:center;z-index:1000;cursor:pointer;padding:24px;';
 
+        // URLからファイル名を抽出する関数
+        function extractFileName(url) {
+          try {
+            const pathname = new URL(url).pathname;
+            const segments = pathname.split('/');
+            for (let i = segments.length - 1; i >= 0; i--) {
+              const seg = decodeURIComponent(segments[i]);
+              if (/\.(wav|mp3|flac|ogg)$/i.test(seg)) return seg;
+            }
+            // 拡張子が見つからない場合は最後のセグメント
+            const last = decodeURIComponent(segments[segments.length - 1]);
+            return last || null;
+          } catch { return null; }
+        }
+
+        function formatTrackEntry(label, color, url) {
+          const safeUrl = url.replace(/</g, '&lt;');
+          const fileName = extractFileName(url);
+          if (fileName) {
+            return '<div style="margin:8px 0;">' +
+              '<p style="font-size:0.95rem;color:' + color + ';margin:0 0 2px;font-weight:600;">' + label + ': ' + fileName.replace(/</g, '&lt;') + '</p>' +
+              '<p style="font-size:0.7rem;color:#666680;margin:0;word-break:break-all;">' + safeUrl + '</p>' +
+            '</div>';
+          }
+          return '<div style="margin:8px 0;">' +
+            '<p style="font-size:0.95rem;color:' + color + ';margin:0 0 2px;font-weight:600;">' + label + '</p>' +
+            '<p style="font-size:0.7rem;color:#666680;margin:0;word-break:break-all;">' + safeUrl + '</p>' +
+          '</div>';
+        }
+
         let urlListHtml = '';
         if (params.trackAUrl) {
-          urlListHtml += '<p style="font-size:0.82rem;color:#8888aa;margin:4px 0;word-break:break-all;"><strong style="color:#00d4ff;">Track A:</strong> ' + params.trackAUrl.replace(/</g, '&lt;') + '</p>';
+          urlListHtml += formatTrackEntry('Track A', '#00d4ff', params.trackAUrl);
         }
         if (params.trackBUrl) {
-          urlListHtml += '<p style="font-size:0.82rem;color:#8888aa;margin:4px 0;word-break:break-all;"><strong style="color:#ff6b9d;">Track B:</strong> ' + params.trackBUrl.replace(/</g, '&lt;') + '</p>';
+          urlListHtml += formatTrackEntry('Track B', '#ff6b9d', params.trackBUrl);
         }
 
         autoLoadOverlay.innerHTML =
