@@ -1749,25 +1749,70 @@
         if (!trackAReady || !trackBReady) return;
         this._stopSources();
         const clampedOffset = Math.max(0, offset);
-        if (this.trackA.useMediaElement && this.trackA.audioElement) {
-          this.trackA.audioElement.currentTime = clampedOffset;
-          this.trackA.audioElement.play();
+
+        // MediaElement トラックがあるかチェック
+        const aIsMedia = this.trackA.useMediaElement && this.trackA.audioElement;
+        const bIsMedia = this.trackB.useMediaElement && this.trackB.audioElement;
+
+        if (aIsMedia || bIsMedia) {
+          // MediaElement モード: seeked イベントを待ってから同時再生
+          this._playSyncMediaElements(clampedOffset, aIsMedia, bIsMedia);
+        } else {
+          // AudioBuffer モード: 即座に同期再生
+          this._playBufferSources(clampedOffset);
+        }
+        this._playbackState = { isPlaying: true, startedAt: this.audioContext.currentTime, offset: clampedOffset };
+      }
+      _playBufferSources(offset) {
+        if (this.trackA.buffer) {
+          this.trackA.source = this.audioContext.createBufferSource();
+          this.trackA.source.buffer = this.trackA.buffer;
+          this.trackA.source.connect(this.trackA.volumeGain);
+          this.trackA.source.start(0, offset);
+        }
+        if (this.trackB.buffer) {
+          this.trackB.source = this.audioContext.createBufferSource();
+          this.trackB.source.buffer = this.trackB.buffer;
+          this.trackB.source.connect(this.trackB.volumeGain);
+          this.trackB.source.start(0, offset);
+        }
+      }
+      _playSyncMediaElements(offset, aIsMedia, bIsMedia) {
+        const seekPromises = [];
+
+        // まず全トラックの currentTime を設定し、seeked を待つ
+        if (aIsMedia) {
+          this.trackA.audioElement.currentTime = offset;
+          seekPromises.push(new Promise(resolve => {
+            this.trackA.audioElement.addEventListener('seeked', resolve, { once: true });
+          }));
         } else if (this.trackA.buffer) {
           this.trackA.source = this.audioContext.createBufferSource();
           this.trackA.source.buffer = this.trackA.buffer;
           this.trackA.source.connect(this.trackA.volumeGain);
-          this.trackA.source.start(0, clampedOffset);
         }
-        if (this.trackB.useMediaElement && this.trackB.audioElement) {
-          this.trackB.audioElement.currentTime = clampedOffset;
-          this.trackB.audioElement.play();
+
+        if (bIsMedia) {
+          this.trackB.audioElement.currentTime = offset;
+          seekPromises.push(new Promise(resolve => {
+            this.trackB.audioElement.addEventListener('seeked', resolve, { once: true });
+          }));
         } else if (this.trackB.buffer) {
           this.trackB.source = this.audioContext.createBufferSource();
           this.trackB.source.buffer = this.trackB.buffer;
           this.trackB.source.connect(this.trackB.volumeGain);
-          this.trackB.source.start(0, clampedOffset);
         }
-        this._playbackState = { isPlaying: true, startedAt: this.audioContext.currentTime, offset: clampedOffset };
+
+        // 全トラックのシーク完了を待ってから同時再生
+        Promise.all(seekPromises).then(() => {
+          if (!this._playbackState.isPlaying) return; // 待機中に停止された場合
+          if (aIsMedia) { this.trackA.audioElement.play(); }
+          else if (this.trackA.source) { this.trackA.source.start(0, offset); }
+          if (bIsMedia) { this.trackB.audioElement.play(); }
+          else if (this.trackB.source) { this.trackB.source.start(0, offset); }
+          // seeked 完了後の正確なタイミングで startedAt を更新
+          this._playbackState.startedAt = this.audioContext.currentTime;
+        });
       }
       stop() {
         const currentTime = this.getCurrentTime();
@@ -1793,9 +1838,14 @@
         const wasPlaying = this._playbackState.isPlaying;
         if (wasPlaying) this._stopSources();
         this._playbackState.offset = Math.max(0, position);
-        if (this.trackA.useMediaElement && this.trackA.audioElement) { this.trackA.audioElement.currentTime = this._playbackState.offset; }
-        if (this.trackB.useMediaElement && this.trackB.audioElement) { this.trackB.audioElement.currentTime = this._playbackState.offset; }
-        if (wasPlaying) this.play(this._playbackState.offset);
+        if (!wasPlaying) {
+          // 停止中のシーク: MediaElement の currentTime だけ更新
+          if (this.trackA.useMediaElement && this.trackA.audioElement) { this.trackA.audioElement.currentTime = this._playbackState.offset; }
+          if (this.trackB.useMediaElement && this.trackB.audioElement) { this.trackB.audioElement.currentTime = this._playbackState.offset; }
+        } else {
+          // 再生中のシーク: play() が seeked を待ってから同期再生する
+          this.play(this._playbackState.offset);
+        }
       }
       setCrossfade(value) {
         this._crossfadeValue = value;
