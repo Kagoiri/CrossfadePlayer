@@ -390,6 +390,39 @@
       transform: scale(1.15);
     }
 
+    /* ===== Pan Control (L/ST/R) ===== */
+    .pan-control {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+    }
+
+    .pan-btn {
+      padding: 4px 10px;
+      min-width: 36px;
+      min-height: 32px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-bg-input);
+      color: var(--color-text-muted);
+      cursor: pointer;
+      transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+      user-select: none;
+    }
+
+    .pan-btn:hover {
+      background: var(--color-bg-hover);
+      color: var(--color-text);
+    }
+
+    .pan-btn[aria-pressed="true"] {
+      background: rgba(124, 92, 255, 0.2);
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+
     /* ===== Center Panel ===== */
     .center-panel {
       background: var(--color-bg-panel);
@@ -927,6 +960,12 @@
           aria-valuenow="1"
         />
       </div>
+
+      <div class="pan-control" role="group" aria-label="Track Aの出力先">
+        <button class="pan-btn" data-track="A" data-pan="L" aria-pressed="false">L</button>
+        <button class="pan-btn" data-track="A" data-pan="ST" aria-pressed="true">ST</button>
+        <button class="pan-btn" data-track="A" data-pan="R" aria-pressed="false">R</button>
+      </div>
     </section>
 
     <!-- Center Panel -->
@@ -1040,6 +1079,12 @@
           aria-valuemax="1"
           aria-valuenow="1"
         />
+      </div>
+
+      <div class="pan-control" role="group" aria-label="Track Bの出力先">
+        <button class="pan-btn" data-track="B" data-pan="L" aria-pressed="false">L</button>
+        <button class="pan-btn" data-track="B" data-pan="ST" aria-pressed="true">ST</button>
+        <button class="pan-btn" data-track="B" data-pan="R" aria-pressed="false">R</button>
       </div>
     </section>
   </main>
@@ -1315,7 +1360,7 @@
     }
 
     function createTrackState() {
-      return { buffer: null, source: null, volumeGain: null, crossfadeGain: null, audioElement: null, mediaSource: null, useMediaElement: false, noCorsMode: false };
+      return { buffer: null, source: null, volumeGain: null, crossfadeGain: null, pannerNode: null, audioElement: null, mediaSource: null, useMediaElement: false, noCorsMode: false };
     }
 
     function isPlayEnabled(trackALoaded, trackBLoaded) {
@@ -1356,8 +1401,21 @@
         if (!t.crossfadeGain) {
           t.crossfadeGain = this.audioContext.createGain();
         }
+        if (!t.pannerNode) {
+          t.pannerNode = this.audioContext.createStereoPanner();
+          t.pannerNode.pan.value = 0; // デフォルト: ST（センター）
+        }
+        // volumeGain → crossfadeGain → pannerNode → destination
         t.volumeGain.connect(t.crossfadeGain);
-        t.crossfadeGain.connect(this.audioContext.destination);
+        t.crossfadeGain.connect(t.pannerNode);
+        t.pannerNode.connect(this.audioContext.destination);
+      }
+      setPan(track, value) {
+        // value: -1 (L), 0 (ST), 1 (R)
+        const t = track === 'A' ? this.trackA : this.trackB;
+        if (t.pannerNode && this.audioContext) {
+          t.pannerNode.pan.setValueAtTime(value, this.audioContext.currentTime);
+        }
       }
       async loadTrack(track, url, originalUrl) {
         if (!isValidUrl(url)) {
@@ -1637,6 +1695,7 @@
           if (t.audioElement) { t.audioElement.pause(); t.audioElement.removeAttribute('src'); t.audioElement.load(); if (t.audioElement.parentNode) t.audioElement.parentNode.removeChild(t.audioElement); t.audioElement = null; }
           if (t.volumeGain) { t.volumeGain.disconnect(); t.volumeGain = null; }
           if (t.crossfadeGain) { t.crossfadeGain.disconnect(); t.crossfadeGain = null; }
+          if (t.pannerNode) { t.pannerNode.disconnect(); t.pannerNode = null; }
           t.buffer = null;
           t.useMediaElement = false;
           t.noCorsMode = false;
@@ -2122,6 +2181,20 @@
       // Waveform clicks
       UI.els.waveformA.addEventListener('click', (e) => handleWaveformClick('A', e));
       UI.els.waveformB.addEventListener('click', (e) => handleWaveformClick('B', e));
+
+      // Pan buttons (L/ST/R)
+      document.querySelectorAll('.pan-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const track = btn.dataset.track;
+          const pan = btn.dataset.pan;
+          const panValue = pan === 'L' ? -1 : pan === 'R' ? 1 : 0;
+          audioEngine.setPan(track, panValue);
+          // Update button states
+          document.querySelectorAll('.pan-btn[data-track="' + track + '"]').forEach(b => {
+            b.setAttribute('aria-pressed', b.dataset.pan === pan ? 'true' : 'false');
+          });
+        });
+      });
 
       // Keyboard shortcuts help toggle
       UI.els.shortcutsToggle.addEventListener('click', () => {
