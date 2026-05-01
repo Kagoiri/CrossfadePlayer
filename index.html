@@ -1325,19 +1325,41 @@
         const href = urlString !== undefined ? urlString : window.location.href;
         const url = new URL(href);
         const params = url.searchParams;
-        return { trackAUrl: params.get('a') || null, trackBUrl: params.get('b') || null };
+        return {
+          trackAUrl: params.get('a') || null,
+          trackBUrl: params.get('b') || null,
+          startTime: params.has('t') ? parseFloat(params.get('t')) : null,
+          loop: params.has('loop') ? params.get('loop') === '1' : null,
+          panA: params.get('pa') || null,
+          panB: params.get('pb') || null,
+          crossfade: params.has('cf') ? parseFloat(params.get('cf')) : null,
+        };
       },
-      updateUrl(trackAUrl, trackBUrl) {
+      updateUrl(trackAUrl, trackBUrl, options) {
         const url = new URL(window.location.href);
         if (trackAUrl) { url.searchParams.set('a', trackAUrl); } else { url.searchParams.delete('a'); }
         if (trackBUrl) { url.searchParams.set('b', trackBUrl); } else { url.searchParams.delete('b'); }
+        if (options) {
+          if (options.startTime != null && options.startTime > 0) { url.searchParams.set('t', options.startTime); } else { url.searchParams.delete('t'); }
+          if (options.loop != null) { url.searchParams.set('loop', options.loop ? '1' : '0'); } else { url.searchParams.delete('loop'); }
+          if (options.panA && options.panA !== 'ST') { url.searchParams.set('pa', options.panA); } else { url.searchParams.delete('pa'); }
+          if (options.panB && options.panB !== 'ST') { url.searchParams.set('pb', options.panB); } else { url.searchParams.delete('pb'); }
+          if (options.crossfade != null && options.crossfade !== 0.5) { url.searchParams.set('cf', options.crossfade); } else { url.searchParams.delete('cf'); }
+        }
         window.history.replaceState({}, '', url.toString());
       },
-      generateShareUrl(trackAUrl, trackBUrl, baseUrl) {
+      generateShareUrl(trackAUrl, trackBUrl, options, baseUrl) {
         const base = baseUrl !== undefined ? baseUrl : window.location.origin + window.location.pathname;
         const url = new URL(base);
         if (trackAUrl) { url.searchParams.set('a', trackAUrl); }
         if (trackBUrl) { url.searchParams.set('b', trackBUrl); }
+        if (options) {
+          if (options.startTime != null && options.startTime > 0) { url.searchParams.set('t', options.startTime); }
+          if (options.loop != null) { url.searchParams.set('loop', options.loop ? '1' : '0'); }
+          if (options.panA && options.panA !== 'ST') { url.searchParams.set('pa', options.panA); }
+          if (options.panB && options.panB !== 'ST') { url.searchParams.set('pb', options.panB); }
+          if (options.crossfade != null && options.crossfade !== 0.5) { url.searchParams.set('cf', options.crossfade); }
+        }
         return url.toString();
       },
       async copyToClipboard(url) {
@@ -2390,10 +2412,30 @@
       UI.updateLoopState(AppState.isLooping);
     }
 
+    function getCurrentPan(track) {
+      const activeBtn = document.querySelector('.pan-btn[data-track="' + track + '"][aria-pressed="true"]');
+      return activeBtn ? activeBtn.dataset.pan : 'ST';
+    }
+
+    function applyPan(track, panStr) {
+      const panValue = panStr === 'L' ? -1 : panStr === 'R' ? 1 : 0;
+      audioEngine.setPan(track, panValue);
+      document.querySelectorAll('.pan-btn[data-track="' + track + '"]').forEach(b => {
+        b.setAttribute('aria-pressed', b.dataset.pan === panStr ? 'true' : 'false');
+      });
+    }
+
     async function handleShare() {
       const shareUrl = ShareManager.generateShareUrl(
         AppState.trackA.loadingState === 'loaded' ? AppState.trackA.url : null,
-        AppState.trackB.loadingState === 'loaded' ? AppState.trackB.url : null
+        AppState.trackB.loadingState === 'loaded' ? AppState.trackB.url : null,
+        {
+          startTime: AppState.playback.currentTime,
+          loop: AppState.isLooping,
+          panA: getCurrentPan('A'),
+          panB: getCurrentPan('B'),
+          crossfade: AppState.crossfaderValue,
+        }
       );
       const success = await ShareManager.copyToClipboard(shareUrl);
       const shareBtn = UI.els.shareBtn;
@@ -2603,14 +2645,7 @@
       // Pan buttons (L/ST/R)
       document.querySelectorAll('.pan-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-          const track = btn.dataset.track;
-          const pan = btn.dataset.pan;
-          const panValue = pan === 'L' ? -1 : pan === 'R' ? 1 : 0;
-          audioEngine.setPan(track, panValue);
-          // Update button states
-          document.querySelectorAll('.pan-btn[data-track="' + track + '"]').forEach(b => {
-            b.setAttribute('aria-pressed', b.dataset.pan === pan ? 'true' : 'false');
-          });
+          applyPan(btn.dataset.track, btn.dataset.pan);
         });
       });
 
@@ -2701,12 +2736,24 @@
           urlListHtml += formatTrackEntry('Track B', '#ff6b9d', params.trackBUrl);
         }
 
+        // Additional parameters display
+        let optionsHtml = '';
+        const optionItems = [];
+        if (params.startTime != null && params.startTime > 0) { optionItems.push('開始位置: ' + formatTime(params.startTime)); }
+        if (params.loop === true) { optionItems.push('ループ: ON'); }
+        if (params.panA && params.panA !== 'ST') { optionItems.push('Track A パン: ' + params.panA); }
+        if (params.panB && params.panB !== 'ST') { optionItems.push('Track B パン: ' + params.panB); }
+        if (params.crossfade != null && params.crossfade !== 0.5) { optionItems.push('フェーダー: ' + (params.crossfade === 0 ? 'A' : params.crossfade === 1 ? 'B' : Math.round(params.crossfade * 100) + '%')); }
+        if (optionItems.length > 0) {
+          optionsHtml = '<p style="font-size:0.78rem;color:#8888aa;margin:8px 0 0;">' + optionItems.join(' / ') + '</p>';
+        }
+
         autoLoadOverlay.innerHTML =
           '<div style="text-align:center;color:#e0e0f0;max-width:600px;">' +
             '<p style="font-size:1.3rem;margin-bottom:8px;">🎵 CrossfadePlayer</p>' +
             '<p style="font-size:0.95rem;color:#8888aa;margin-bottom:16px;">クロスフェード再生用の音源として、ネットワーク上のファイルを読み込みます。</p>' +
             '<div style="background:rgba(26,26,53,0.8);border:1px solid #2a2a4a;border-radius:8px;padding:12px 16px;margin-bottom:20px;text-align:left;">' +
-              urlListHtml +
+              urlListHtml + optionsHtml +
             '</div>' +
             '<p style="font-size:1rem;color:#e0e0f0;padding:10px 28px;display:inline-block;border:1px solid #7c5cff;border-radius:8px;background:rgba(124,92,255,0.12);">▶ クリックして読み込みを開始</p>' +
           '</div>';
@@ -2719,6 +2766,25 @@
           }
           if (params.trackBUrl) {
             await handleLoadTrack('B');
+          }
+          // Apply additional parameters after tracks are loaded
+          if (params.loop !== null) {
+            AppState.isLooping = params.loop;
+            audioEngine.setLooping(params.loop);
+            UI.updateLoopState(params.loop);
+          }
+          if (params.panA) { applyPan('A', params.panA); }
+          if (params.panB) { applyPan('B', params.panB); }
+          if (params.crossfade != null && isFinite(params.crossfade)) {
+            handleCrossfadeChange(Math.max(0, Math.min(1, params.crossfade)));
+          }
+          if (params.startTime != null && params.startTime > 0) {
+            AppState.playback.currentTime = params.startTime;
+            audioEngine._playbackState.offset = params.startTime;
+            const duration = audioEngine.getDuration();
+            if (duration > 0) {
+              UI.updateProgress(params.startTime, duration);
+            }
           }
         };
         autoLoadOverlay.addEventListener('click', startAutoLoad, { once: true });
